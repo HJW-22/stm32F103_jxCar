@@ -19,13 +19,14 @@ typedef struct
 typedef enum {
     MPU_IDLE,
     MPU_READ_REQUESTED,
+    MPU_DMA_READING, 
     MPU_DATA_READY
 } MPU6050_State_t;
 
 extern volatile MPU6050_State_t MPU6050_State;
 extern MPU6050_DataTypeDef MPU6050_Data;
 
-void MPU6050_DMA_Read(MPU6050_DataTypeDef* data);
+void MPU6050_DMA_Read(void);
 uint8_t MPU6050_DMA_IsDataReady(void);
 void MPU6050_WriteReg(uint8_t RegAddress,int8_t Data);
 void MPU6050_ReadReg(MPU6050_DataTypeDef* DataStruct);
@@ -33,6 +34,8 @@ void MPU6050_Init(void);
 void MPU6050_ConvertData(MPU6050_DataTypeDef* RawData,float* AccData,float* GyroData,float* Temperature);  
 void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct);
 uint8_t MPU6050_GetID(void);
+void MPU6050_DMA_Init(void); 
+
 
 #endif
 

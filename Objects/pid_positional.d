@@ -30,4 +30,5 @@
 .\objects\pid_positional.o: .\Library\misc.h
 .\objects\pid_positional.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\objects\pid_positional.o: Hardware\PID_Positional.h
+.\objects\pid_positional.o: Hardware\Motor.h
 .\objects\pid_positional.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\math.h

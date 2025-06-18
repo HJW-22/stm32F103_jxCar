@@ -105,8 +105,9 @@ void Main_Config()
     Serial_Init();
     OLED_Init();
     USART3_DMA_Init();
+    MPU6050_DMA_Init();
 
-
+    
     #ifdef SETLOACTION_MODE
     // 初始化电机A的PID
     PID_Init(&pidA, 0.07,0.02,0.1,PID_VERSION_VARIABLE_INTEGRAL,PID_VERSION_DIFFERENTIAL_FIRST_AND_INCOMPLETE,0.9);
@@ -364,6 +365,7 @@ void MotorControlLoop_Dual() {
 
 
 int main(void){
+    Delay_ms(100);
     Main_Config();
     while (1) {
         if (page1_flag) {
@@ -385,21 +387,23 @@ int main(void){
         }
 
 
-        // switch (MPU6050_State) {
-        //     case MPU_READ_REQUESTED:
-        //         if (MPU6050_DMA_IsDataReady()) {
-        //             MPU6050_DMA_Read(&MPU6050_Data);
-        //             MPU6050_State = MPU_IDLE; // 防止重复请求
-        //         }
-        //         break;
-                
-        //     case MPU_DATA_READY:
-        //         i(&MPU6050_Data);
-        //         // 此处添加控制逻辑（如PID计算）
-        //         MPU6050_State = MPU_IDLE;
-        //         break;
-        // }
-
+        switch (MPU6050_State) {
+            case MPU_READ_REQUESTED:
+                MPU6050_DMA_Read();
+                MPU6050_State = MPU_DMA_READING; // 进入DMA等待状态
+                break;
+        
+            case MPU_DATA_READY:
+                MPU6050_CalculateAngle(&MPU6050_Data);
+                // 执行控制逻辑（如PID）
+                MPU6050_State = MPU_IDLE; // 处理完成后回到空闲
+                break;
+        
+            case MPU_DMA_READING: // 无需操作，等待DMA中断
+            case MPU_IDLE:        // 无操作
+            default:
+                break;
+        }
 
         // 串口改变目标值
         Serial_change();
@@ -411,15 +415,20 @@ int main(void){
 void TIM1_UP_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) {
-        if(++mpu6050_count == 3)
+        if(++mpu6050_count == 3)//3ms
         {
             mpu6050_count=0;
             // 仅触发读取请求，不阻塞中断
-            if (MPU6050_State == MPU_IDLE) {
-                MPU6050_State = MPU_READ_REQUESTED;
-            }
+            // if (MPU6050_State == MPU_IDLE) {
+            //     MPU6050_State = MPU_READ_REQUESTED;
+    
+            // }
+            MPU6050_ReadReg(&MPU6050_Data);
+            MPU6050_CalculateAngle(&MPU6050_Data);
         }
-        if (++pid_count == 30){ // 每 30 个中断触发一次 OLED
+        if (++pid_count == 30)//30ms
+        {
+
         pid_count = 0; // 重置计数器，以便下次计算
         #ifdef SETLOACTION_MODE
         MotorControlLoop_SetLoaction();

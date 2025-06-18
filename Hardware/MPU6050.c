@@ -11,7 +11,8 @@
 
 volatile uint8_t DMA_Ready = 1;
 
-MPU6050_DataTypeDef MPU6050_Data;
+// 在全局变量声明处添加
+__attribute__((aligned(4))) MPU6050_DataTypeDef MPU6050_Data;
 volatile MPU6050_State_t MPU6050_State = MPU_IDLE;
 
 // 定义全局超时变量  
@@ -178,35 +179,6 @@ void MPU6050_Init(void)
     I2C_Cmd(I2C1,ENABLE);
 
 
-    // 2初始化DMA1通道6（I2C1_RX）
-    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-    DMA_InitTypeDef DMA_InitStructure;
-    DMA_InitStructure.DMA_BufferSize=sizeof(MPU6050_DataTypeDef)/2;
-    DMA_InitStructure.DMA_DIR=DMA_DIR_PeripheralSRC;
-    DMA_InitStructure.DMA_M2M=DMA_M2M_Disable;
-    DMA_InitStructure.DMA_MemoryBaseAddr=(uint32_t)&MPU6050_Data;
-    DMA_InitStructure.DMA_MemoryDataSize=DMA_PeripheralDataSize_Byte;
-    DMA_InitStructure.DMA_MemoryInc=DMA_MemoryInc_Enable;
-    DMA_InitStructure.DMA_Mode=DMA_Mode_Normal;
-    DMA_InitStructure.DMA_PeripheralBaseAddr=(uint32_t)&(I2C1->DR);
-    DMA_InitStructure.DMA_PeripheralDataSize=DMA_PeripheralDataSize_Byte;
-    DMA_InitStructure.DMA_PeripheralInc=DMA_PeripheralInc_Disable;
-    DMA_InitStructure.DMA_Priority=DMA_Priority_High;
-    
-
-    DMA_Init(DMA1_Channel7,&DMA_InitStructure);
-
-    NVIC_InitTypeDef NVIC_InitStructure;
-    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel7_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority=0;
-
-    NVIC_Init(&NVIC_InitStructure);
-    DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, ENABLE);
-
-    I2C_DMACmd(I2C1, ENABLE);
-
     // 复位MPU6050  
     MPU6050_WriteReg(MPU6050_PWR_MGMT_1, MPU6050_PWR_MGMT_1_RESET);  
     Delay_ms(100);  // 延时等待复位完成  
@@ -223,37 +195,45 @@ void MPU6050_Init(void)
     // 配置采样率 (可选)  
     MPU6050_WriteReg(MPU6050_SMPLRT_DIV, 0x07);  // 采样率 = 陀螺仪输出率 / (1 + 7) = 1kHz  
 }  
-// 启动DMA传输
-void MPU6050_DMA_Read(MPU6050_DataTypeDef* data) {
-    if (!DMA_Ready) return;
+
+
+
+// 修改后的DMA读取函数
+void MPU6050_DMA_Read(void) {
+    if (MPU6050_State != MPU_IDLE) return;
     
-    DMA_Ready = 0;
+    MPU6050_State = MPU_READ_REQUESTED;
     
     // 1. 发送起始条件+设备地址+寄存器地址
     while (I2C_GetFlagStatus(I2C1, I2C_FLAG_BUSY));
+
     I2C_GenerateSTART(I2C1, ENABLE);
-    while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));
-    
+    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+
     I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);
-    while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
     
-    I2C_SendData(I2C1, 0x3B); // 从ACCEL_XOUT_H开始读取
-    while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
+    I2C_SendData(I2C1, MPU6050_ACCEL_XOUT_H);
+    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED); 
     
     // 2. 重新发送起始条件，切换到读模式
     I2C_GenerateSTART(I2C1, ENABLE);
-    while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));
-    
+    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+
     I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Receiver);
-    while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));
-    
-    // 3. 配置DMA并启动
+    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
+ 
+    // 3. 配置并启动DMA传输
+    DMA_Cmd(DMA1_Channel7, DISABLE);
     DMA_SetCurrDataCounter(DMA1_Channel7, sizeof(MPU6050_DataTypeDef));
+    I2C_DMALastTransferCmd(I2C1, ENABLE);  // 重要！最后一次传输生成NACK
     DMA_Cmd(DMA1_Channel7, ENABLE);
-    
-    // 4. 使能I2C的DMA请求
     I2C_DMACmd(I2C1, ENABLE);
+    
+    // 4. 设置状态为等待DMA完成
+    MPU6050_State = MPU_DATA_READY;
 }
+
 
 
 
@@ -312,9 +292,45 @@ void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct)
 
 
 void DMA1_Channel7_IRQHandler(void) {
-    if (DMA_GetITStatus(DMA1_IT_TC7)) {
+    if(DMA_GetITStatus(DMA1_IT_TC7)) {
         DMA_ClearITPendingBit(DMA1_IT_TC7);
-        I2C_GenerateSTOP(I2C1, ENABLE);
-        MPU6050_State = MPU_DATA_READY; // 标记数据就绪
+        I2C_GenerateSTOP(I2C1, ENABLE); // 发送停止信号
+        MPU6050_State = MPU_DATA_READY; // 更新状态
     }
+}
+
+
+void MPU6050_DMA_Init(void)  
+{
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+    DMA_DeInit(DMA1_Channel7);
+    
+    DMA_InitTypeDef DMA_InitStructure;
+    DMA_InitStructure.DMA_BufferSize=sizeof(MPU6050_DataTypeDef);
+    DMA_InitStructure.DMA_DIR=DMA_DIR_PeripheralSRC;
+    DMA_InitStructure.DMA_M2M=DMA_M2M_Disable;
+    DMA_InitStructure.DMA_MemoryBaseAddr=(uint32_t)&MPU6050_Data;
+    DMA_InitStructure.DMA_MemoryDataSize=DMA_PeripheralDataSize_Byte;
+    DMA_InitStructure.DMA_MemoryInc=DMA_MemoryInc_Enable;
+    DMA_InitStructure.DMA_Mode=DMA_Mode_Normal;
+    DMA_InitStructure.DMA_PeripheralBaseAddr=(uint32_t)&(I2C1->DR);
+    DMA_InitStructure.DMA_PeripheralDataSize=DMA_PeripheralDataSize_Byte;
+    DMA_InitStructure.DMA_PeripheralInc=DMA_PeripheralInc_Disable;
+    DMA_InitStructure.DMA_Priority=DMA_Priority_High;
+    
+
+    DMA_Init(DMA1_Channel7,&DMA_InitStructure);
+
+    NVIC_InitTypeDef NVIC_InitStructure;
+    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel7_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority=0;
+
+    NVIC_Init(&NVIC_InitStructure);
+
+    DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, ENABLE);
+
+    I2C_DMACmd(I2C1, ENABLE);
+
 }

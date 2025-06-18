@@ -63,7 +63,6 @@ typedef struct {
 
 // PID双环控制(内环速度外环位置)配置结构体（推荐）
 typedef struct {
-
     uint8_t name;
     //内环参数
     float kp;
