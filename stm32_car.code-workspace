@@ -1,0 +1,16 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "files.associations": {
+            "string.h": "c",
+            "math.h": "c",
+            "motor.h": "c",
+            "typeinfo": "c"
+        }
+    },
+    "extensions": {}
+}
