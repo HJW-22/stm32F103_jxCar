@@ -203,6 +203,81 @@ int16_t PID_DualLoopControl(PID_BicyclicParams *pid)
 }
 
 
+// 双环控制函数(没有如何优化,只有限幅)
+int16_t PID_Angle(PID_AngleParam *pid) 
+{
+    // 获取实际值
+    if(pid->GetPWM != NULL) {
+        pid->actual = pid->GetPWM();
+        if(pid->name == MOTOR_A){
+        motorA_speed +=pid->actual;
+        }else
+        {
+            motorB_speed +=pid->actual; 
+        }
+    } else {
+        // 外环使用全局位置变量
+        pid->actual = (pid->name == MOTOR_A) ? motorA_speed : motorB_speed;
+    }
+
+    // PID计算
+    pid->state.error[1] = pid->state.error[0];
+    pid->state.error[0] = pid->target - pid->actual;
+    
+    // 积分项处理
+    if (pid->ki != 0) {
+        pid->state.integral += pid->state.error[0];
+    }
+    
+    // PID计算
+    pid->output = pid->kp * pid->state.error[0] 
+                + pid->ki * pid->state.integral 
+                + pid->kd * (pid->state.error[0] - pid->state.error[1]);
+    
+    // 输出限幅
+    pid->output = constrain(pid->output, pid->outMin, pid->outMax);
+
+    // 应用输出
+    if(pid->SetPWM != NULL) {
+        pid->SetPWM(pid->output);
+    }
+    
+    return pid->output;
+}
+
+
+
+
+
+
+void PID_Init_Angle( uint8_t name, PID_AngleParam *pid, int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
+{  
+
+    pid->name=name;
+    // 设置函数指针  
+    pid->GetPWM = GetPWM; // 初始化获取 PWM 的函数  
+    pid->SetPWM = SetPWM; // 初始化设置 PWM 的函数 
+    // 初始化内环参数  
+    pid->kp = kp;  
+    pid->ki = ki;  
+    pid->kd = kd;   
+    
+    pid->outMax=outMax;
+    pid->outMin=outMin;
+
+    // 初始化目标值、实际值和输出  
+    pid->target = 0;  
+    pid->target = 0;   
+    pid->actual = 0;  
+    pid->actual = 0;  
+    pid->output = 0;  
+    pid->output = 0;  
+
+    // 清零状态  
+    memset(&pid->state, 0, sizeof(pid->state));  
+}  
+
+
 
 
 

@@ -9,13 +9,19 @@
 #include "MPU6050.h"
 #include "PID_Positional.h"
 
-//PID_Init
+
 #define MOTORA_DEBUG
 // #define MOTORB_DEBUG
 
+
+//PID_Init
 //PID_Init_BicyclicParams
-#define SETLOACTION_MODE
-// #define DUALCONTROL_MODE
+//PID_Init_Angle
+
+// #define SETLOACTION_MODE
+//#define DUALCONTROL_MODE
+#define ANGLE_MODE
+
 
 
 //统一采用电机A调试 俩者不可共存 
@@ -25,11 +31,8 @@
     #endif
 #endif
 
-//定位置PID  双环PID(外环位置,内环速度)
-#ifdef SETLOACTION_MODE
-    #ifdef DUALCONTROL_MODE
-        #error "MOTORA_DEBUG and MOTORB_DEBUG cannot be defined at the same time!"
-    #endif
+#if (defined(SETLOACTION_MODE) + defined(DUALCONTROL_MODE) + defined(ANGLE_MODE)) > 1
+    #error "Only one of SETLOACTION_MODE, DUALCONTROL_MODE, or ANGLE_MODE can be defined!"
 #endif
 
 #ifdef SETLOACTION_MODE
@@ -41,8 +44,10 @@
     PID_BicyclicParams pidA_outer,pidB_outer;
 #endif // DUALCONTROL_MODE
 
-
-
+#ifdef ANGLE_MODE
+    PID_AngleParam pidA_inner,pidB_inner;
+    PID_AngleParam pidA_outer,pidB_outer;
+#endif
 /*typec方向左B2TIM2 右A1TIM3
 电机的插线反了 即PWMA代表的是电机B
 即PWMB代表的是电机A
@@ -86,15 +91,20 @@ uint16_t pid_count = 0;
 uint16_t oled_rxClear_count=0;
 uint8_t oled_rxClear_flag=0;
 
-
+int16_t angle_temp=0;
 
 
 //   ------------------PID调试变量------------------
  float TargetA, ActualA, OutA;
  float TargetB, ActualB, OutB;
 
+ uint8_t fallDown_flag=0;
 
 
+int16_t Angle_Get()
+{
+return ((-angle_temp)+10  );
+}
 
 void Main_Config()
 {
@@ -123,6 +133,15 @@ void Main_Config()
     PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM2_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
     PID_Init_BicyclicParams(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
     #endif // DUALCONTROL_MODE
+
+
+    #ifdef ANGLE_MODE
+    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,0.5,0,0,-50,50,MotorA_SetSpeed);
+    PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
+
+    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,0.5,0,0,-50,50,MotorB_SetSpeed);
+    PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
+    #endif
   
 }
 
@@ -363,6 +382,43 @@ void MotorControlLoop_Dual() {
 #endif //DUALCONTROL_MODE
 
 
+#ifdef ANGLE_MODE
+void MotorControlLoop_Angle() {
+    // pidA_outer.target = TargetA;
+    // pidB_outer.target = TargetB;
+
+    // pidA_inner.target =PID_Angle(&pidA_outer);
+    // pidB_inner.target =PID_Angle(&pidB_outer);
+
+    // PID_Angle(&pidA_inner);
+    // PID_Angle(&pidB_inner);
+
+    // ActualA=pidA_outer.actual;
+    // ActualB=pidB_outer.actual;
+   
+    // OutA=pidA_outer.output;
+    // OutB=pidB_outer.output;
+   
+
+    pidA_inner.target = TargetA;
+    pidB_inner.target = TargetB;
+
+    PID_Angle(&pidA_inner);
+    PID_Angle(&pidB_inner);
+
+
+    ActualA=pidA_inner.actual;
+    ActualB=pidB_inner.actual;
+
+    OutA=pidA_inner.output;
+    OutB=pidB_inner.output;
+
+
+}
+#endif //ANGLE_MODE
+
+
+
 
 int main(void){
     Delay_ms(100);
@@ -425,8 +481,9 @@ void TIM1_UP_IRQHandler(void)
             // }
             MPU6050_ReadReg(&MPU6050_Data);
             MPU6050_CalculateAngle(&MPU6050_Data);
+            angle_temp=MPU6050_Data.GyroX;
         }
-        if (++pid_count == 30)//30ms
+        if (++pid_count == 5)//30ms
         {
 
         pid_count = 0; // 重置计数器，以便下次计算
@@ -437,6 +494,11 @@ void TIM1_UP_IRQHandler(void)
         #ifdef DUALCONTROL_MODE
         MotorControlLoop_Dual();
         #endif // DUALCONTROL_MODE
+
+        #ifdef ANGLE_MODE
+        MotorControlLoop_Angle();
+        #endif // ANGLE_MODE
+
         }
         if(++oled_rxClear_count==3000)
         {

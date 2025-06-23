@@ -17,10 +17,10 @@ typedef struct
 } MPU6050_DataTypeDef;  
 
 typedef enum {
-    MPU_IDLE,
-    MPU_READ_REQUESTED,
-    MPU_DMA_READING, 
-    MPU_DATA_READY
+    MPU_IDLE,           //空闲状态
+    MPU_READ_REQUESTED, //读取MPU6050请求
+    MPU_DMA_READING,    //读取MPU6050寄存器中
+    MPU_DATA_READY      //准备被DMA读取
 } MPU6050_State_t;
 
 extern volatile MPU6050_State_t MPU6050_State;
