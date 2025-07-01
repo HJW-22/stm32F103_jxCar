@@ -3,7 +3,7 @@
 
 void MyI2C_W_SCL(uint8_t BitValue)
 {
-    GPIO_WriteBit(GPIOB,GPIO_Pin_8,(BitAction)BitValue);
+    GPIO_WriteBit(GPIOB,USART3_FLAG,(BitAction)BitValue);
     Delay_us(10);
 }
 

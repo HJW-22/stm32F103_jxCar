@@ -44,55 +44,53 @@ void MPU6050_WaitEvent(I2C_TypeDef* I2Cx, uint32_t I2C_EVENT)
 
 void MPU6050_WriteReg(uint8_t RegAddress,int8_t Data)
 {
-
-
-    I2C_GenerateSTART(I2C1, ENABLE);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+    I2C_GenerateSTART(I2C2, ENABLE);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
 	
-	I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+	I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Transmitter);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
 	
-	I2C_SendData(I2C1, RegAddress);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTING);
+	I2C_SendData(I2C2, RegAddress);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTING);
 	
-	I2C_SendData(I2C1, Data);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
+	I2C_SendData(I2C2, Data);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
 	
-	I2C_GenerateSTOP(I2C1, ENABLE);
+	I2C_GenerateSTOP(I2C2, ENABLE);
 }
 
 void MPU6050_ReadReg(MPU6050_DataTypeDef* DataStruct)
 {
     uint8_t i, Data[14]; 
 
-	I2C_GenerateSTART(I2C1, ENABLE);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+	I2C_GenerateSTART(I2C2, ENABLE);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
 	
-	I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+	I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Transmitter);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
 	
-	I2C_SendData(I2C1, MPU6050_ACCEL_XOUT_H);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
+	I2C_SendData(I2C2, MPU6050_ACCEL_XOUT_H);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
 	
-	I2C_GenerateSTART(I2C1, ENABLE);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+	I2C_GenerateSTART(I2C2, ENABLE);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
 	
-	I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Receiver);
-	MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
+	I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Receiver);
+	MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
 
-    I2C_AcknowledgeConfig(I2C1, ENABLE);  
+    I2C_AcknowledgeConfig(I2C2, ENABLE);  
     for ( i = 0; i < 13; i++)
     {
-   MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED);
-	Data[i] = I2C_ReceiveData(I2C1);
+   MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_RECEIVED);
+	Data[i] = I2C_ReceiveData(I2C2);
   
     }
 
-    I2C_AcknowledgeConfig(I2C1,DISABLE);
-    I2C_GenerateSTOP(I2C1,ENABLE); 
+    I2C_AcknowledgeConfig(I2C2,DISABLE);
+    I2C_GenerateSTOP(I2C2,ENABLE); 
 
-     MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED);
-	Data[13] = I2C_ReceiveData(I2C1);
+     MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_RECEIVED);
+	Data[13] = I2C_ReceiveData(I2C2);
 
 		
 
@@ -114,39 +112,39 @@ uint8_t MPU6050_GetID(void)
     uint8_t id = 0;
     
     // 发送起始条件
-    I2C_GenerateSTART(I2C1, ENABLE);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+    I2C_GenerateSTART(I2C2, ENABLE);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
     
     // 发送设备地址(写模式)
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+    I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Transmitter);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
     
     // 发送要读取的寄存器地址(WHO_AM_I)
-    I2C_SendData(I2C1, MPU6050_WHO_AM_I);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
+    I2C_SendData(I2C2, MPU6050_WHO_AM_I);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
     
     // 发送重复起始条件
-    I2C_GenerateSTART(I2C1, ENABLE);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+    I2C_GenerateSTART(I2C2, ENABLE);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
     
     // 发送设备地址(读模式)
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Receiver);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
+    I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Receiver);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
     
     // 禁用应答(因为只读取一个字节)
-    I2C_AcknowledgeConfig(I2C1, DISABLE);
+    I2C_AcknowledgeConfig(I2C2, DISABLE);
     
     // 发送停止条件
-    I2C_GenerateSTOP(I2C1, ENABLE);
+    I2C_GenerateSTOP(I2C2, ENABLE);
     
     // 等待数据接收完成
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_RECEIVED);
     
     // 读取数据
-    id = I2C_ReceiveData(I2C1);
+    id = I2C_ReceiveData(I2C2);
     
     // 重新启用应答(为后续操作做准备)
-    I2C_AcknowledgeConfig(I2C1, ENABLE);
+    I2C_AcknowledgeConfig(I2C2, ENABLE);
     
     return id;
 }
@@ -157,12 +155,12 @@ uint8_t MPU6050_GetID(void)
 void MPU6050_Init(void)  
 {  
     // MyI2C_Init();  
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1,ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2,ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB,ENABLE);
 
     GPIO_InitTypeDef GPIO_InitStructure;
     GPIO_InitStructure.GPIO_Mode=GPIO_Mode_AF_OD;
-    GPIO_InitStructure.GPIO_Pin=GPIO_Pin_6|GPIO_Pin_7;
+    GPIO_InitStructure.GPIO_Pin=GPIO_Pin_10|GPIO_Pin_11;
     GPIO_InitStructure.GPIO_Speed=GPIO_Speed_50MHz;
 
     GPIO_Init(GPIOB,&GPIO_InitStructure);
@@ -174,9 +172,9 @@ void MPU6050_Init(void)
     I2C_InitStructurn.I2C_DutyCycle=I2C_DutyCycle_16_9;
     I2C_InitStructurn.I2C_Mode=I2C_Mode_I2C;
     I2C_InitStructurn.I2C_OwnAddress1=0x00;
-    I2C_Init(I2C1,&I2C_InitStructurn);
+    I2C_Init(I2C2,&I2C_InitStructurn);
 
-    I2C_Cmd(I2C1,ENABLE);
+    I2C_Cmd(I2C2,ENABLE);
 
 
     // 复位MPU6050  
@@ -205,30 +203,30 @@ void MPU6050_DMA_Read(void) {
     MPU6050_State = MPU_READ_REQUESTED;
     
     // 1. 发送起始条件+设备地址+寄存器地址
-    while (I2C_GetFlagStatus(I2C1, I2C_FLAG_BUSY));
+    while (I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY));
 
-    I2C_GenerateSTART(I2C1, ENABLE);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+    I2C_GenerateSTART(I2C2, ENABLE);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
 
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+    I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Transmitter);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
     
-    I2C_SendData(I2C1, MPU6050_ACCEL_XOUT_H);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED); 
+    I2C_SendData(I2C2, MPU6050_ACCEL_XOUT_H);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED); 
     
     // 2. 重新发送起始条件，切换到读模式
-    I2C_GenerateSTART(I2C1, ENABLE);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT);
+    I2C_GenerateSTART(I2C2, ENABLE);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT);
 
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Receiver);
-    MPU6050_WaitEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
+    I2C_Send7bitAddress(I2C2, MPU6050_ADDRESS, I2C_Direction_Receiver);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
  
     // 3. 配置并启动DMA传输
     DMA_Cmd(DMA1_Channel7, DISABLE);
     DMA_SetCurrDataCounter(DMA1_Channel7, sizeof(MPU6050_DataTypeDef));
-    I2C_DMALastTransferCmd(I2C1, ENABLE);  // 重要！最后一次传输生成NACK
+    I2C_DMALastTransferCmd(I2C2, ENABLE);  // 重要！最后一次传输生成NACK
     DMA_Cmd(DMA1_Channel7, ENABLE);
-    I2C_DMACmd(I2C1, ENABLE);
+    I2C_DMACmd(I2C2, ENABLE);
     
     // 4. 设置状态为等待DMA完成
     MPU6050_State = MPU_DATA_READY;
@@ -294,7 +292,7 @@ void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct)
 void DMA1_Channel7_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_IT_TC7)) {
         DMA_ClearITPendingBit(DMA1_IT_TC7);
-        I2C_GenerateSTOP(I2C1, ENABLE); // 发送停止信号
+        I2C_GenerateSTOP(I2C2, ENABLE); // 发送停止信号
         MPU6050_State = MPU_DATA_READY; // 更新状态
     }
 }
@@ -303,7 +301,7 @@ void DMA1_Channel7_IRQHandler(void) {
 void MPU6050_DMA_Init(void)  
 {
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-    DMA_DeInit(DMA1_Channel7);
+    DMA_DeInit(DMA1_Channel5);
     
     DMA_InitTypeDef DMA_InitStructure;
     DMA_InitStructure.DMA_BufferSize=sizeof(MPU6050_DataTypeDef);
@@ -313,24 +311,24 @@ void MPU6050_DMA_Init(void)
     DMA_InitStructure.DMA_MemoryDataSize=DMA_PeripheralDataSize_Byte;
     DMA_InitStructure.DMA_MemoryInc=DMA_MemoryInc_Enable;
     DMA_InitStructure.DMA_Mode=DMA_Mode_Normal;
-    DMA_InitStructure.DMA_PeripheralBaseAddr=(uint32_t)&(I2C1->DR);
+    DMA_InitStructure.DMA_PeripheralBaseAddr=(uint32_t)&(I2C2->DR);
     DMA_InitStructure.DMA_PeripheralDataSize=DMA_PeripheralDataSize_Byte;
     DMA_InitStructure.DMA_PeripheralInc=DMA_PeripheralInc_Disable;
     DMA_InitStructure.DMA_Priority=DMA_Priority_High;
     
 
-    DMA_Init(DMA1_Channel7,&DMA_InitStructure);
+    DMA_Init(DMA1_Channel5,&DMA_InitStructure);
 
     NVIC_InitTypeDef NVIC_InitStructure;
-    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel7_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannel=DMA1_Channel5_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=0;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority=0;
 
     NVIC_Init(&NVIC_InitStructure);
 
-    DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, ENABLE);
+    DMA_ITConfig(DMA1_Channel5, DMA_IT_TC, ENABLE);
 
-    I2C_DMACmd(I2C1, ENABLE);
+    I2C_DMACmd(I2C2, ENABLE);
 
 }

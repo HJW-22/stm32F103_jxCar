@@ -63,8 +63,8 @@ GPIO_Pin_14 BIN2
 */
 
 /*串口说明 串口1发送 串口2修改
-串口1用来发送PID的值 即Target Actual Out 图形化调试  为PB8与PB9
-串口2用来修改PID的值 发送格式为@XXXX 加回车  具体串口会写  为PA3与PA2
+串口2用来发送PID的值 即Target Actual Out 图形化调试  为PB8与PB9
+串口1用来修改PID的值 发送格式为@XXXX 加回车  具体串口会写  为PA3与PA2
 */
 
 
@@ -103,19 +103,19 @@ int16_t angle_temp=0;
 
 int16_t Angle_Get()
 {
-return ((-angle_temp)+10  );
+return ((-angle_temp)+12  );
 }
 
 void Main_Config()
 {
     Motor_Init();
-    Encoder_TIM2_Init();
+    Encoder_TIM4_Init();
     Encoder_TIM3_Init();
     MPU6050_Init();
     Serial_Init();
     OLED_Init();
-    USART3_DMA_Init();
-    MPU6050_DMA_Init();
+    USART2_DMA_Init();
+//    MPU6050_DMA_Init();
 
     
     #ifdef SETLOACTION_MODE
@@ -130,16 +130,16 @@ void Main_Config()
     PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
     PID_Init_BicyclicParams(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
 
-    PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM2_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
+    PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM4_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
     PID_Init_BicyclicParams(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
     #endif // DUALCONTROL_MODE
 
 
     #ifdef ANGLE_MODE
-    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,0.5,0,0,-50,50,MotorA_SetSpeed);
+    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,0.5,0,0.1,-50,50,MotorA_SetSpeed);
     PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
 
-    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,0.5,0,0,-50,50,MotorB_SetSpeed);
+    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,0.5,0,0.1                   ,-50,50,MotorB_SetSpeed);
     PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
     #endif
   
@@ -210,8 +210,18 @@ void OLED_MPU6050CycleDisplay()
 // 使用OLED测试串口是否正常使用 最好发2位 不然OLED挤不下一行
 void OLED_SerialDisplay()
 {
+
+    #ifdef USART1_FLAG
+    Serial_Printf(USART1, "串口1初始化成功！\n");
+    #endif // USART1_FLAG
+
+    #ifdef USART2_FLAG
     Serial_Printf(USART2, "串口2初始化成功！\n");
+    #endif // USART2_FLAG
+
+    #ifdef USART3_FLAG
     Serial_Printf(USART3, "串口3初始化成功！\n");
+    #endif // USART3_FLAG
 
     // 测试程序
     /*
@@ -263,7 +273,7 @@ void OLED_SerialCycleDisplay()
     }  
     
     // 发送格式化数据  
-    USART3_DMA_Send((uint8_t *)buffer, len);  
+    USART2_DMA_Send((uint8_t *)buffer, len);  
 }
 
 void Serial_change()
@@ -274,46 +284,46 @@ void Serial_change()
         oled_rxClear_flag=0;
         OLED_ClearLine(4);  // 清除第4行
     }
-    if (!Serial_RxFlag2) {
+    if (!Serial_RxFlag1) {
         return; // 没有新数据时直接返回
     }
-    if (Serial_RxFlag2) {
+    if (Serial_RxFlag1) {
         // 将接收到的数据通过串口回显
         OLED_ClearLine(4);
-        OLED_ShowString(4, 1, Serial_RxPacket2);
+        OLED_ShowString(4, 1, Serial_RxPacket1);
 
-        if (strcmp(Serial_RxPacket2, "TargetA add") == 0) {
+        if (strcmp(Serial_RxPacket1, "TargetA add") == 0) {
             TargetA += 10;
         }
-        else if (strcmp(Serial_RxPacket2, "TargetA lower") == 0) {
+        else if (strcmp(Serial_RxPacket1, "TargetA lower") == 0) {
             TargetA -= 10;
         }
 
-        else if (strcmp(Serial_RxPacket2, "TargetB add") == 0) {
+        else if (strcmp(Serial_RxPacket1, "TargetB add") == 0) {
             TargetB += 10;
         }
-        else if (strcmp(Serial_RxPacket2, "TargetB lower") == 0) {
+        else if (strcmp(Serial_RxPacket1, "TargetB lower") == 0) {
             TargetB -= 10;
         }
-        else if (strcmp(Serial_RxPacket2, "MotorA forward") == 0) {
+        else if (strcmp(Serial_RxPacket1, "MotorA forward") == 0) {
             TargetA += 330*4;
             //TargetA += 100;
         }
-        else if (strcmp(Serial_RxPacket2, "MotorA backward") == 0) {
+        else if (strcmp(Serial_RxPacket1, "MotorA backward") == 0) {
            TargetA += -330*4;
             //TargetA += -100;
         }
-        else if (strcmp(Serial_RxPacket2, "page1") == 0) {
+        else if (strcmp(Serial_RxPacket1, "page1") == 0) {
             page1_firstEntry = 1;
             page1_flag       = 1;
             page2_flag       = 0;
         }
-        else if (strcmp(Serial_RxPacket2, "page2") == 0) {
+        else if (strcmp(Serial_RxPacket1, "page2") == 0) {
             page2_firstEntry = 1;
             page1_flag       = 0;
             page2_flag       = 1;
         }
-        Serial_RxFlag2 = 0; // 重置接收标志
+        Serial_RxFlag1 = 0; // 重置接收标志
     }
 }
 
@@ -424,6 +434,7 @@ int main(void){
     Delay_ms(100);
     Main_Config();
     while (1) {
+    
         if (page1_flag) {
             if (page1_firstEntry) {
                 OLED_PIDDisplay();
@@ -431,7 +442,7 @@ int main(void){
                 page1_firstEntry = 0;
             } else {
                 OLED_PIDCycleDisplay();
-                OLED_SerialCycleDisplay();
+               // OLED_SerialCycleDisplay();
             }
         } else if (page2_flag) {
             if (page2_firstEntry) {
@@ -468,9 +479,9 @@ int main(void){
 
 
 // 使用 static 关键字使 Count 保持其值
-void TIM1_UP_IRQHandler(void)
+void TIM2_IRQHandler(void)
 {
-    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) {
+    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) {
         if(++mpu6050_count == 3)//3ms
         {
             mpu6050_count=0;
@@ -481,7 +492,7 @@ void TIM1_UP_IRQHandler(void)
             // }
             MPU6050_ReadReg(&MPU6050_Data);
             MPU6050_CalculateAngle(&MPU6050_Data);
-            angle_temp=MPU6050_Data.GyroX;
+            angle_temp=MPU6050_Data.GyroY;
         }
         if (++pid_count == 5)//30ms
         {
@@ -506,7 +517,7 @@ void TIM1_UP_IRQHandler(void)
             oled_rxClear_flag=1;
         }
         // 确保清除中断标志，避免重复触发
-        TIM_ClearITPendingBit(TIM1, TIM_IT_Update); // 根据您的定时器和情况调整
+        TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 根据您的定时器和情况调整
     }
 }
 

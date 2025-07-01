@@ -26,7 +26,7 @@ void Serial_Init(void)
 	USART_InitTypeDef USART_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-    #ifdef usart1_flag
+    #ifdef USART1_FLAG
     
 	  //------------------- 串口1初始化 --------------------
 	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1,ENABLE);
@@ -63,9 +63,9 @@ void Serial_Init(void)
 	  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=usart1_preemption;
 	  NVIC_InitStructure.NVIC_IRQChannelSubPriority=usart1_sub;
 	  NVIC_Init(&NVIC_InitStructure);
-	#endif // usart1_flag
+	#endif // USART1_FLAG
 
-	#ifdef usart2_flag
+	#ifdef USART2_FLAG
 	 //------------------- 串口2初始化 --------------------
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
@@ -117,7 +117,7 @@ void Serial_Init(void)
 
 
 	
-	#ifdef usart3_flag
+	#ifdef USART3_FLAG
     //------------------- 串口3初始化 --------------------
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3,ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
@@ -239,7 +239,7 @@ void Serial_SendNumber(uint32_t Number, uint8_t Length, USART_TypeDef *USARTx)
 
 
 
-#ifdef usart1_flag
+#ifdef USART1_FLAG
 
 void USART1_IRQHandler(void)
 {
@@ -286,7 +286,7 @@ void USART1_IRQHandler(void)
 #endif // DEBUG
 
 
-#ifdef usart2_flag
+#ifdef USART2_FLAG
 
 void USART2_IRQHandler(void)
 {
@@ -330,10 +330,57 @@ void USART2_IRQHandler(void)
 	}
 } 
 
-#endif // usart2_flag
+void USART2_DMA_Init(void) {  
+	// 使能DMA时钟  
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);  
+	
+	DMA_InitTypeDef DMA_InitStructure;  
+	
+	// TX DMA配置  
+	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART2->DR;  //外设基地址
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)TxBuffer_USART2;  //缓冲区基地址
+	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;  //指定外设是源还是目的地destination
+	DMA_InitStructure.DMA_BufferSize = TX_BUFFER_SIZE;  //缓冲区大小
+	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;  //设置源(外设)是否自动增加
+	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;  //设置目的地(缓冲区)是否自动增加
+	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;  //外设数据的类型
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;  //缓冲区数据的类型
+	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;  //模式循环还是正常
+	DMA_InitStructure.DMA_Priority = DMA_Priority_Medium;  //优先级
+	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;   //内存到内存模式
+	
+	// 初始化DMA  
+	DMA_Init(USART2_TX_DMA_CHANNEL, &DMA_InitStructure);  
+	
+	// 使能USART2的DMA发送  
+	USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);  
+}
 
 
-#ifdef usart3_flag
+void USART2_DMA_Send(uint8_t* data, uint16_t size) {  
+	// 确保不超过缓冲区大小  
+	size = (size > TX_BUFFER_SIZE) ? TX_BUFFER_SIZE : size;  
+	
+	// 复制数据到缓冲区  
+	memcpy(TxBuffer_USART2, data, size);  
+	
+	// 关闭DMA  
+	DMA_Cmd(USART2_TX_DMA_CHANNEL, DISABLE);  
+	
+	// 设置传输数据量  
+	DMA_SetCurrDataCounter(USART2_TX_DMA_CHANNEL, size);  
+	
+	// 更新内存地址  
+	DMA1_Channel7->CMAR = (uint32_t)TxBuffer_USART2;  
+	
+	// 使能DMA  
+	DMA_Cmd(USART2_TX_DMA_CHANNEL, ENABLE);  
+}
+
+#endif // USART2_FLAG
+
+
+#ifdef USART3_FLAG
 
 void USART3_IRQHandler(void)
 {
@@ -378,7 +425,6 @@ void USART3_IRQHandler(void)
 	}
 } 
 
-#endif // usart3_flag
 
 
 void USART3_DMA_Init(void) {  
@@ -389,7 +435,7 @@ void USART3_DMA_Init(void) {
     
     // TX DMA配置  
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART3->DR;  //外设基地址
-    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)TxBuffer;  //缓冲区基地址
+    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)TxBuffer_USART3;  //缓冲区基地址
     DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;  //指定外设是源还是目的地destination
     DMA_InitStructure.DMA_BufferSize = TX_BUFFER_SIZE;  //缓冲区大小
     DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;  //设置源(外设)是否自动增加
@@ -413,7 +459,7 @@ void USART3_DMA_Send(uint8_t* data, uint16_t size) {
     size = (size > TX_BUFFER_SIZE) ? TX_BUFFER_SIZE : size;  
     
     // 复制数据到缓冲区  
-    memcpy(TxBuffer, data, size);  
+    memcpy(TxBuffer_USART3, data, size);  
     
     // 关闭DMA  
     DMA_Cmd(USART3_TX_DMA_CHANNEL, DISABLE);  
@@ -422,8 +468,12 @@ void USART3_DMA_Send(uint8_t* data, uint16_t size) {
     DMA_SetCurrDataCounter(USART3_TX_DMA_CHANNEL, size);  
     
     // 更新内存地址  
-    DMA1_Channel2->CMAR = (uint32_t)TxBuffer;  
+    DMA1_Channel2->CMAR = (uint32_t)TxBuffer_USART3;  
     
     // 使能DMA  
     DMA_Cmd(USART3_TX_DMA_CHANNEL, ENABLE);  
 }  
+
+#endif // USART3_FLAG
+
+
