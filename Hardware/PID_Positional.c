@@ -206,6 +206,7 @@ int16_t PID_DualLoopControl(PID_BicyclicParams *pid)
 // 双环控制函数(没有如何优化,只有限幅)
 int16_t PID_Angle(PID_AngleParam *pid) 
 {
+    
     // 获取实际值
     if(pid->GetPWM != NULL) {
         pid->actual = pid->GetPWM();
@@ -234,8 +235,17 @@ int16_t PID_Angle(PID_AngleParam *pid)
                 + pid->ki * pid->state.integral 
                 + pid->kd * (pid->state.error[0] - pid->state.error[1]);
     
+
+    
     // 输出限幅
     pid->output = constrain(pid->output, pid->outMin, pid->outMax);
+
+    // // 7. 死区（可选）
+    // if(pid->GetPWM != NULL) {
+    //     if (fabs(pid->state.error[0]) < 50) {
+    //         pid->output = 0;
+    //     }
+    // }
 
     // 应用输出
     if(pid->SetPWM != NULL) {
@@ -276,6 +286,21 @@ void PID_Init_Angle( uint8_t name, PID_AngleParam *pid, int16_t (*GetPWM)(void),
     // 清零状态  
     memset(&pid->state, 0, sizeof(pid->state));  
 }  
+
+void PID_Angle_Clear(PID_AngleParam *pid)
+{
+    // 初始化目标值、实际值和输出  
+    pid->target = 0;  
+    pid->target = 0;   
+    pid->actual = 0;  
+    pid->actual = 0;  
+    pid->output = 0;  
+    pid->output = 0;  
+    motorA_speed=0;
+    motorB_speed=0;
+    // 清零状态  
+    memset(&pid->state, 0, sizeof(pid->state));  
+}
 
 
 

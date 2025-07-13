@@ -18,8 +18,8 @@
 #ifdef USART1_FLAG
 extern char Serial_RxPacket1[];  // 用于 USART1 的接收缓冲区 
 extern uint8_t Serial_RxFlag1;    // 用于 USART1 的接收标志 
-#define usart1_preemption 1
-#define usart1_sub        1
+#define usart1_preemption 0
+#define usart1_sub        0
 #endif 
 
 #ifdef USART2_FLAG
@@ -49,10 +49,10 @@ static uint8_t TxBuffer_USART3[TX_BUFFER_SIZE];
 //USART部分
 void Serial_Init(void);  
 void Serial_SendByte(uint8_t Byte, USART_TypeDef *USARTx);  // 发送单个字节到指定USART  
-void Serial_SendNumber(uint32_t Number, uint8_t Length, USART_TypeDef *USARTx); // 发送数字到指定USART  
 void Serial_SendArray(uint8_t *Array, uint16_t Length, USART_TypeDef *USARTx); // 发送数组到指定USART  
 void Serial_SendString(char *String, USART_TypeDef *USARTx);  // 发送字符串到指定USART  
 void Serial_Printf(USART_TypeDef *USARTx, char *format, ...);  // 格式化发送字符串到指定USART  
+void Serial_SendNumber(int32_t Number, uint8_t Length, USART_TypeDef *USARTx); 
 
 
 #ifdef USART2_FLAG

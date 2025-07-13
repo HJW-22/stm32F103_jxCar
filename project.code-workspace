@@ -4,10 +4,6 @@
             "path": "."
         }
     ],
-    "settings": {
-        "files.associations": {
-            "oled_font.h": "c"
-        }
-    },
+    "settings": {},
     "extensions": {}
 }

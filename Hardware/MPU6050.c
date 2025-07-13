@@ -14,6 +14,8 @@ volatile uint8_t DMA_Ready = 1;
 // 在全局变量声明处添加
 __attribute__((aligned(4))) MPU6050_DataTypeDef MPU6050_Data;
 volatile MPU6050_State_t MPU6050_State = MPU_IDLE;
+MPU6050_AngleData MPU6050_Angle;
+
 
 // 定义全局超时变量  
 volatile uint16_t I2C_Timeout = MPU6050_TIMEOUT;
@@ -23,7 +25,7 @@ volatile uint16_t I2C_Timeout = MPU6050_TIMEOUT;
 float angleX = 0.0f;  
 float angleY = 0.0f;  
 float angleZ = 0.0f;  
-float dt = 0.05f;    
+float dt = 0.003f;    
 
 #define MPU6050_ADDRESS 0xD0
 
@@ -260,30 +262,36 @@ void MPU6050_ConvertData(MPU6050_DataTypeDef* RawData,
     // 温度转换（MPU6050手册中的转换公式）  
     *Temperature = (float)RawData->Temp / 340.0f + 36.53f;  
 }  
+void sendFloat(float value, USART_TypeDef *USARTx) {
+    char buffer[20]; // 创建一个足够大的缓冲区来存放数字
+    snprintf(buffer, sizeof(buffer), "%.2f", value); // 转换为字符串，保留两位小数
+    Serial_Printf(USARTx,"angleY的值是:");
+    Serial_SendString(buffer, USARTx); // 正确地发送字符串
+    Serial_SendString("\n", USARTx); // 发送换行符
+}
 
 void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct)  
 {  
     // 角度计算  
-    float gyroXrate = (float)DataStruct->GyroX / 65.5f; // 角速度转换  
+    // float gyroXrate = (float)DataStruct->GyroX / 65.5f; // 角速度转换  
     float gyroYrate = (float)DataStruct->GyroY / 65.5f;  
     
     // 积分计算角度  
-    angleX += gyroXrate * dt;  // 积分获得X轴角度  
+    // angleX += gyroXrate * dt;  // 积分获得X轴角度  
     angleY += gyroYrate * dt;  // 积分获得Y轴角度  
 
     // 使用加速度计进行一定的校正  
-    float accXangle = atan2(DataStruct->AccY, DataStruct->AccZ) * 180 / M_PI; // 计算俯仰角  
+    // float accXangle = atan2(DataStruct->AccY, DataStruct->AccZ) * 180 / M_PI; // 计算俯仰角  
     float accYangle = atan2(-DataStruct->AccX, sqrt(DataStruct->AccY * DataStruct->AccY + DataStruct->AccZ * DataStruct->AccZ)) * 180 / M_PI; // 计算偏航角  
 
     // 简单互补滤波法  
-    angleX = 0.98f * angleX + 0.02f * accXangle;   // 融合角度  
+    // angleX = 0.98f * angleX + 0.02f * accXangle;   // 融合角度  
     angleY = 0.98f * angleY + 0.02f * accYangle;  
 
-    // 输出计算的角度，可根据需要进行打印  
-    //printf("Angle X: %f, Angle Y: %f\n", angleX, angleY); 
+    //  sendFloat(angleY, USART1); // 发送格式化后的浮点数
     
-    DataStruct->GyroX=angleX;
-    DataStruct->GyroY=angleY;
+    // MPU6050_Angle.X_Angle=angleX;
+    MPU6050_Angle.Y_Angle=angleY;
   
 }  
 

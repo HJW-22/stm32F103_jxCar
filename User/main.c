@@ -83,7 +83,8 @@ float AccData[3];
 float GyroData[3];
 float Temperature;
 int16_t AX, AY, AZ, GX, GY, GZ;
-uint16_t mpu6050_count =0;
+uint16_t mpu6050_count;
+uint8_t mpu6050_timingFlag;
 
 
 //   ------------------定时器计次位------------------
@@ -91,7 +92,7 @@ uint16_t pid_count = 0;
 uint16_t oled_rxClear_count=0;
 uint8_t oled_rxClear_flag=0;
 
-int16_t angle_temp=0;
+float angle_temp=0;
 
 
 //   ------------------PID调试变量------------------
@@ -99,20 +100,21 @@ int16_t angle_temp=0;
  float TargetB, ActualB, OutB;
 
  uint8_t fallDown_flag=0;
-
+ uint8_t angle_errorFlag=0;
+ uint8_t pid_timingFlag=0;
 
 int16_t Angle_Get()
 {
-return ((-angle_temp)+12  );
+return ((-angle_temp));
 }
 
 void Main_Config()
 {
+    Serial_Init(); 
     Motor_Init();
     Encoder_TIM4_Init();
     Encoder_TIM3_Init();
     MPU6050_Init();
-    Serial_Init();
     OLED_Init();
     USART2_DMA_Init();
 //    MPU6050_DMA_Init();
@@ -133,13 +135,12 @@ void Main_Config()
     #endif // DUALCONTROL_MODE
 
     #ifdef ANGLE_MODE
-    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,0.5,0,0.1,-50,50,MotorA_SetSpeed);
-    PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
+    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3.5,0.01,1,-100,100,MotorA_SetSpeed);
+    // PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.1,0,20,-100,100,NULL);
 
-    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,0.5,0,0.1                   ,-50,50,MotorB_SetSpeed);
-    PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
+    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3.5,0.01,1,-100,100,MotorB_SetSpeed);
+    // PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.1,0,20,-100,100,NULL);
     #endif
-
 }
 
 void OLED_PIDDisplay()
@@ -449,24 +450,60 @@ int main(void){
             }
         }
 
-
-        switch (MPU6050_State) {
-            case MPU_READ_REQUESTED:
-                MPU6050_DMA_Read();
-                MPU6050_State = MPU_DMA_READING; // 进入DMA等待状态
-                break;
-        
-            case MPU_DATA_READY:
-                MPU6050_CalculateAngle(&MPU6050_Data);
-                // 执行控制逻辑（如PID）
-                MPU6050_State = MPU_IDLE; // 处理完成后回到空闲
-                break;
-        
-            case MPU_DMA_READING: // 无需操作，等待DMA中断
-            case MPU_IDLE:        // 无操作
-            default:
-                break;
+        if (mpu6050_timingFlag)
+        {
+            MPU6050_ReadReg(&MPU6050_Data);
+            MPU6050_CalculateAngle(&MPU6050_Data);
+            angle_temp=MPU6050_Angle.Y_Angle;
+            if (angle_temp < -50 || angle_temp > 60) // 角度异常
+            {
+                MPU6050_Angle.Y_Angle=0;
+                TIM_Cmd(TIM2,DISABLE);
+                MotorA_SetSpeed(0);
+                MotorB_SetSpeed(0);
+                PID_Angle_Clear(&pidA_inner);
+                PID_Angle_Clear(&pidB_inner);
+                PID_Angle_Clear(&pidA_outer);
+                PID_Angle_Clear(&pidA_outer);
+                TIM_Cmd(TIM2,ENABLE);
+            }
+            mpu6050_timingFlag=0;
         }
+        if (pid_timingFlag)
+        {
+            #ifdef SETLOACTION_MODE
+            MotorControlLoop_SetLoaction();
+            #endif // SETLOACTION_MODE
+
+            #ifdef DUALCONTROL_MODE
+            MotorControlLoop_Dual();
+            #endif // DUALCONTROL_MODE
+
+            #ifdef ANGLE_MODE
+            MotorControlLoop_Angle();
+            #endif // ANGLE_MODE
+            pid_timingFlag=0;
+        }
+
+        
+
+        // switch (MPU6050_State) {
+        //     case MPU_READ_REQUESTED:
+        //         MPU6050_DMA_Read();
+        //         MPU6050_State = MPU_DMA_READING; // 进入DMA等待状态
+        //         break;
+        
+        //     case MPU_DATA_READY:
+        //         MPU6050_CalculateAngle(&MPU6050_Data);
+        //         // 执行控制逻辑（如PID）
+        //         MPU6050_State = MPU_IDLE; // 处理完成后回到空闲
+        //         break;
+        
+        //     case MPU_DMA_READING: // 无需操作，等待DMA中断
+        //     case MPU_IDLE:        // 无操作
+        //     default:
+        //         break;
+        // }
 
         // 串口改变目标值
         Serial_change();
@@ -477,44 +514,31 @@ int main(void){
 // 使用 static 关键字使 Count 保持其值
 void TIM2_IRQHandler(void)
 {
-    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) {
+    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) 
+    {
         if(++mpu6050_count == 3)//3ms
         {
             mpu6050_count=0;
+            mpu6050_timingFlag=1;
             // 仅触发读取请求，不阻塞中断
             // if (MPU6050_State == MPU_IDLE) {
             //     MPU6050_State = MPU_READ_REQUESTED;
-    
             // }
-            MPU6050_ReadReg(&MPU6050_Data);
-            MPU6050_CalculateAngle(&MPU6050_Data);
-            angle_temp=MPU6050_Data.GyroY;
         }
-        if (++pid_count == 5)//30ms
+        if(++pid_count == 5)//5ms
         {
-
-        pid_count = 0; // 重置计数器，以便下次计算
-        #ifdef SETLOACTION_MODE
-        MotorControlLoop_SetLoaction();
-        #endif // SETLOACTION_MODE
-
-        #ifdef DUALCONTROL_MODE
-        MotorControlLoop_Dual();
-        #endif // DUALCONTROL_MODE
-
-        #ifdef ANGLE_MODE
-        MotorControlLoop_Angle();
-        #endif // ANGLE_MODE
-
+            pid_count = 0; // 重置计数器，以便下次计算
+            pid_timingFlag=1;
         }
-        if(++oled_rxClear_count==3000)
+        if(++oled_rxClear_count==3000)//3000ms
         {
             oled_rxClear_count=0;
             oled_rxClear_flag=1;
         }
+    }
         // 确保清除中断标志，避免重复触发
         TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 根据您的定时器和情况调整
-    }
 }
+
 
 

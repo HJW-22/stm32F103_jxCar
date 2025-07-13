@@ -1,7 +1,7 @@
 #ifndef __PID_Positional_H__
 #define __PID_Positional_H__
 
-
+#include "stm32f10x.h"                  // Device header
 //À¿«¯„–÷µ
 #define DEADZONE_THRESHOLD 20
 
@@ -132,6 +132,10 @@ void PID_Init_BicyclicParams(
     void (*SetPWM)(int16_t output)
     );  
 int16_t PID_DualLoopControl(PID_BicyclicParams *pid);
+
+
+
+void PID_Angle_Clear(PID_AngleParam *pid);
 
 #endif // !_PID_POSITIONAL__H
 		

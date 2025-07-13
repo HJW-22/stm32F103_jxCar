@@ -11,7 +11,7 @@ void OLED_I2C_Init(void)
 
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1 | RCC_APB2Periph_GPIOB, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-    
+
     GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
     // 启用I2C1引脚重映射(PB8-SCL, PB9-SDA)
     GPIO_PinRemapConfig(GPIO_Remap_I2C1, ENABLE);

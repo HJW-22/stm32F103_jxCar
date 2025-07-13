@@ -16,6 +16,13 @@ typedef struct
     int16_t GyroZ;  
 } MPU6050_DataTypeDef;  
 
+typedef struct   
+{  
+    float X_Angle;
+    float Y_Angle;
+    float Z_Angle;
+} MPU6050_AngleData;  
+
 typedef enum {
     MPU_IDLE,           //ø’œ–◊¥Ã¨
     MPU_READ_REQUESTED, //∂¡»°MPU6050«Î«Û
@@ -25,6 +32,7 @@ typedef enum {
 
 extern volatile MPU6050_State_t MPU6050_State;
 extern MPU6050_DataTypeDef MPU6050_Data;
+extern MPU6050_AngleData MPU6050_Angle;
 
 void MPU6050_DMA_Read(void);
 uint8_t MPU6050_DMA_IsDataReady(void);

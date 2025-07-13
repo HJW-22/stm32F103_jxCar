@@ -382,7 +382,8 @@
             }
           ]
         },
-        "options": "null"
+        "options": "null",
+        "archExtensions": ""
       },
       "uploader": "STLink",
       "uploadConfig": {
@@ -417,11 +418,13 @@
           "Library",
           "Hardware",
           "System",
+          ".cmsis/include",
           "RTE/_Target 1"
         ],
         "libList": [],
         "defineList": [
-          "USE_STDPERIPH_DRIVER"
+          "USE_STDPERIPH_DRIVER",
+          "STM32F10X_MD"
         ]
       },
       "builderOptions": {
@@ -451,5 +454,5 @@
       }
     }
   },
-  "version": "3.5"
+  "version": "3.6"
 }

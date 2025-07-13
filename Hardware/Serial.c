@@ -44,7 +44,7 @@ void Serial_Init(void)
 		GPIO_Init(GPIOA, &GPIO_InitStructure);
   
 	  
-	  USART_InitStructure.USART_BaudRate = 9600;                          //波特率
+	  USART_InitStructure.USART_BaudRate = 128000;                          //波特率
 	  USART_InitStructure.USART_WordLength = USART_WordLength_8b;         //8位数据位
 	  USART_InitStructure.USART_StopBits = USART_StopBits_1;              //停止位1
 	  USART_InitStructure.USART_Parity = USART_Parity_No;                 //无奇偶校验
@@ -63,6 +63,7 @@ void Serial_Init(void)
 	  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=usart1_preemption;
 	  NVIC_InitStructure.NVIC_IRQChannelSubPriority=usart1_sub;
 	  NVIC_Init(&NVIC_InitStructure);
+
 	#endif // USART1_FLAG
 
 	#ifdef USART2_FLAG
@@ -96,16 +97,6 @@ void Serial_Init(void)
 
 	USART_ITConfig(USART2,USART_IT_RXNE,ENABLE);
 	
-	// GPIO_StructInit(&GPIO_InitStructure);
-	// GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	// GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	// GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4|GPIO_Pin_5;
-	// GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-	// GPIO_SetBits(GPIOA, GPIO_Pin_5); // 设置为高电平（3.3V） 
-	// GPIO_ResetBits(GPIOA, GPIO_Pin_4); // 设置为低电平(GND)
-
-
 
 	NVIC_InitStructure.NVIC_IRQChannel=USART2_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelCmd= ENABLE;
@@ -227,15 +218,40 @@ uint32_t Serial_Pow(uint32_t X, uint32_t Y)
 	return Result;
 }
 
-//发送数字
-void Serial_SendNumber(uint32_t Number, uint8_t Length, USART_TypeDef *USARTx)  
+void Serial_SendNumber(int32_t Number, uint8_t Length, USART_TypeDef *USARTx)  
 {  
-    uint8_t i;
-	for (i = 0; i < Length; i ++)
-	{
-		Serial_SendByte(Number / Serial_Pow(10, Length - i - 1) % 10 + '0',USARTx);
-	}
-}  
+    char buffer[12]; // 足够大的缓冲以存放最大32位整型数字，包含负号和结束符 '\0'  
+    uint8_t i = 0;
+
+    // 处理负数
+    if (Number < 0) {
+        Serial_SendByte('-', USARTx); // 先发送负号
+        Number = -Number; // 转为正数
+    }
+
+    // 将数字转成字符串形式
+    uint32_t temp = Number; // 使用临时变量，避免直接修改 Number
+    for (i = 0; i < Length; i++) {
+        buffer[Length - i - 1] = (temp % 10) + '0'; // 从低位开始取出数字
+        temp /= 10;
+    }
+
+    // 如果需要，清理前导零
+    if (temp > 0) {
+        // 如果有剩余的值，大于 Length，表示超出范围，比如 1000 要输出 1000，而不是06
+        while (temp > 0 && i < Length) {
+            buffer[Length - i - 1] = (temp % 10) + '0';
+            temp /= 10;
+            i++;
+        }
+    }
+
+    // 确保以 '\0' 结尾
+    buffer[Length] = '\0'; 
+
+    // 发送整个数字字符串
+    Serial_SendString(buffer, USARTx);
+}
 
 
 
