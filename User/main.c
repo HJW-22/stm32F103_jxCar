@@ -117,14 +117,12 @@ void Main_Config()
     USART2_DMA_Init();
 //    MPU6050_DMA_Init();
 
-    
     #ifdef SETLOACTION_MODE
     // 初始化电机A的PID
     PID_Init(&pidA, 0.07,0.02,0.1,PID_VERSION_VARIABLE_INTEGRAL,PID_VERSION_DIFFERENTIAL_FIRST_AND_INCOMPLETE,0.9);
     // 初始化电机B的PID
     PID_Init(&pidB, 0.07,0.02,0.1,PID_VERSION_VARIABLE_INTEGRAL,PID_VERSION_DIFFERENTIAL_FIRST_AND_INCOMPLETE,0.9);
     #endif // SETLOACTION_MODE
-    
     
     #ifdef DUALCONTROL_MODE
     PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
@@ -134,7 +132,6 @@ void Main_Config()
     PID_Init_BicyclicParams(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
     #endif // DUALCONTROL_MODE
 
-
     #ifdef ANGLE_MODE
     PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,0.5,0,0.1,-50,50,MotorA_SetSpeed);
     PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
@@ -142,7 +139,7 @@ void Main_Config()
     PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,0.5,0,0.1                   ,-50,50,MotorB_SetSpeed);
     PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
     #endif
-  
+
 }
 
 void OLED_PIDDisplay()
@@ -434,7 +431,6 @@ int main(void){
     Delay_ms(100);
     Main_Config();
     while (1) {
-    
         if (page1_flag) {
             if (page1_firstEntry) {
                 OLED_PIDDisplay();
@@ -442,7 +438,7 @@ int main(void){
                 page1_firstEntry = 0;
             } else {
                 OLED_PIDCycleDisplay();
-               // OLED_SerialCycleDisplay();
+                OLED_SerialCycleDisplay();
             }
         } else if (page2_flag) {
             if (page2_firstEntry) {
