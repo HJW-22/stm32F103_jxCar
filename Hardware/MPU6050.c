@@ -9,7 +9,7 @@
 #define MPU6050_ADDRESS 0xD0
 #define MPU6050_TIMEOUT 10000
 
-volatile uint8_t DMA_Ready = 1;
+volatile uint8_t DMA_Ready = 1 ;
 
 // 在全局变量声明处添加
 __attribute__((aligned(4))) MPU6050_DataTypeDef MPU6050_Data;
@@ -91,7 +91,7 @@ void MPU6050_ReadReg(MPU6050_DataTypeDef* DataStruct)
     I2C_AcknowledgeConfig(I2C2,DISABLE);
     I2C_GenerateSTOP(I2C2,ENABLE); 
 
-     MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_RECEIVED);
+    MPU6050_WaitEvent(I2C2, I2C_EVENT_MASTER_BYTE_RECEIVED);
 	Data[13] = I2C_ReceiveData(I2C2);
 
 		
@@ -270,30 +270,32 @@ void sendFloat(float value, USART_TypeDef *USARTx) {
     Serial_SendString("\n", USARTx); // 发送换行符
 }
 
-void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct)  
-{  
-    // 角度计算  
-    // float gyroXrate = (float)DataStruct->GyroX / 65.5f; // 角速度转换  
-    float gyroYrate = (float)DataStruct->GyroY / 65.5f;  
-    
-    // 积分计算角度  
-    // angleX += gyroXrate * dt;  // 积分获得X轴角度  
-    angleY += gyroYrate * dt;  // 积分获得Y轴角度  
+void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct) {
+    // 常量定义
+    #define DT 0.003f          // 采样时间3ms
+    #define GYRO_SENS 65.5f    // 陀螺仪灵敏度
+    #define ALPHA 0.96f        // 互补滤波系数
+    static float angleY = 0.0f;
+    static float gyroYoffset = 0.0f; // 需通过校准获得
 
-    // 使用加速度计进行一定的校正  
-    // float accXangle = atan2(DataStruct->AccY, DataStruct->AccZ) * 180 / M_PI; // 计算俯仰角  
-    float accYangle = atan2(-DataStruct->AccX, sqrt(DataStruct->AccY * DataStruct->AccY + DataStruct->AccZ * DataStruct->AccZ)) * 180 / M_PI; // 计算偏航角  
+    // 陀螺仪角度积分（需校准零偏）
+    float gyroYrate = ((float)DataStruct->GyroY - gyroYoffset) / GYRO_SENS;
+    angleY += gyroYrate * DT;
 
-    // 简单互补滤波法  
-    // angleX = 0.98f * angleX + 0.02f * accXangle;   // 融合角度  
-    angleY = 0.98f * angleY + 0.02f * accYangle;  
+    // 加速度计角度计算（实际是Roll角）
+    float accRoll = atan2(-DataStruct->AccX, 
+                         sqrt(DataStruct->AccY*DataStruct->AccY + 
+                              DataStruct->AccZ*DataStruct->AccZ)) * 180 / M_PI;
 
-    //  sendFloat(angleY, USART1); // 发送格式化后的浮点数
-    
-    // MPU6050_Angle.X_Angle=angleX;
-    MPU6050_Angle.Y_Angle=angleY;
-  
-}  
+    // 互补滤波融合
+    angleY = ALPHA * angleY + (1-ALPHA) * accRoll;
+
+    // 角度限幅
+    if (angleY > 180.0f) angleY = 180.0f;
+    if (angleY < -180.0f) angleY = -180.0f;
+
+    MPU6050_Angle.Y_Angle = angleY;
+}
 
 
 

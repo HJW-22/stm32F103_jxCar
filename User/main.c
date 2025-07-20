@@ -8,6 +8,8 @@
 #include "Serial.h"
 #include "MPU6050.h"
 #include "PID_Positional.h"
+#include "OLED_Font.h"
+#include "Timer.h"
 
 
 #define MOTORA_DEBUG
@@ -23,6 +25,21 @@
 #define ANGLE_MODE
 
 
+/* 128x64 数字符号为8x16 中文为16x16
+--------------OLED显示页面一--------------
+    电机X     
+    实际:+0000 P:xx.x
+    目标:+0000 I:xx.x
+    输出:+0000 D:xx.x
+--------------OLED显示页面二--------------
+    MPU6050姿态角
+    俯仰角:+xxx.xx
+    翻滚角:+xxx.xx
+    偏航角:+xxx.xx
+--------------OLED显示页面三--------------
+
+
+*/
 
 //统一采用电机A调试 俩者不可共存 
 #ifdef MOTORA_DEBUG
@@ -85,12 +102,30 @@ float Temperature;
 int16_t AX, AY, AZ, GX, GY, GZ;
 uint16_t mpu6050_count;
 uint8_t mpu6050_timingFlag;
-
+uint8_t mpu6050_errorFlag;
 
 //   ------------------定时器计次位------------------
 uint16_t pid_count = 0;
 uint16_t oled_rxClear_count=0;
 uint8_t oled_rxClear_flag=0;
+
+
+uint16_t oled_BufClear_count=0;
+uint8_t oled_BufClear_flag=0;
+
+
+uint16_t oled_BufDisplay_count=0;
+uint8_t oled_BufDisplay_flag=0;
+
+uint16_t oled_BufDisplayOne_count=0;
+uint8_t oled_BufDisplayOne_flag=0;
+
+uint16_t oled_BufDisplayThree_count=0;
+uint8_t oled_BufDisplayThree_flag=0;
+
+uint16_t oled_BufDisplayTwo_count=0;
+uint8_t oled_BufDisplayTwo_flag=0;
+
 
 float angle_temp=0;
 
@@ -117,6 +152,7 @@ void Main_Config()
     MPU6050_Init();
     OLED_Init();
     USART2_DMA_Init();
+    Timer_Init();
 //    MPU6050_DMA_Init();
 
     #ifdef SETLOACTION_MODE
@@ -147,62 +183,84 @@ void OLED_PIDDisplay()
 {
     // 测试数据发送
     OLED_Clear();
-    OLED_ShowString(1, 1, "OA:");
-    OLED_ShowString(1, 9, "OB:");
-    OLED_ShowString(2, 1, "TA:");
-    OLED_ShowString(2, 9, "TB:");
-    OLED_ShowString(3, 1, "AA:");
-    OLED_ShowString(3, 9, "AB:");
+//处理修改显示
+#ifdef MOTORA_DEBUG
+    OLED_ShowString(0, 0,  "调试电机A",OLED_8X16);
+#endif 
+#ifdef MOTORB_DEBUG
+    OLED_ShowString(0, 0,  "调试电机B",OLED_8X16);
+#endif
+	OLED_ShowString(0, 16, "实际:",OLED_8X16);
+	OLED_ShowString(0, 32, "目标:",OLED_8X16);
+	OLED_ShowString(0, 48, "输出:",OLED_8X16);
+
+    OLED_ShowString(88, 16, "P:",OLED_8X16);
+    OLED_ShowString(88, 32, "I:",OLED_8X16);
+    OLED_ShowString(88, 48, "D:",OLED_8X16);
+    OLED_Update();
 }
 
 void OLED_PIDCycleDisplay()
 {
-    // 主程序循环
-    OLED_ShowNum(1, 4, OutA, 4);
-    OLED_ShowNum(1, 12, OutB, 4);
-    OLED_ShowNum(2, 4, TargetA, 4);
-    OLED_ShowNum(2, 12, TargetB, 4);
-    OLED_ShowNum(3, 4, ActualA, 4);
-    OLED_ShowNum(3, 12, ActualB, 4);
+    //此函数需要10ms 要缩短到3ms以内
+    //100ms显示1次
+    // if (oled_BufClear_flag)
+    // {
+    //     OLED_ClearArea(40,16,40,48);
+    //     OLED_ClearArea(104,16,24,48);
+    //     oled_BufClear_flag=0;
+    // }
+
+     if (oled_BufDisplayOne_flag)
+    {
+        OLED_ShowSignedNum(40, 16, ActualA, 4,OLED_8X16);
+        OLED_ShowSignedNum(40, 32, TargetA, 4,OLED_8X16);
+        oled_BufDisplayOne_flag=0;
+    }
+     if (oled_BufDisplayTwo_flag)
+    {
+        OLED_ShowSignedNum(40, 48, OutA, 4,OLED_8X16);
+        OLED_ShowUnsignedFloatNum(104, 16, pidA_inner.kp, 1,1,OLED_8X16);
+        oled_BufDisplayTwo_flag=0;
+    }
+     if (oled_BufDisplayThree_flag)
+    {
+        OLED_ShowUnsignedFloatNum(104, 32, pidA_inner.ki, 1,1,OLED_8X16);
+        OLED_ShowUnsignedFloatNum(104, 48, pidA_inner.kd, 1,1,OLED_8X16);
+        oled_BufDisplayThree_flag=0;
+    }
+    if (oled_BufDisplay_flag)
+    {
+        OLED_UpdateArea(40,16,40,48);
+        OLED_UpdateArea(104,16,24,48);
+        oled_BufDisplay_flag=0;
+    }
+   
+  
 }
 
 void OLED_MPU6050Display()
 {
     OLED_Clear();
-    OLED_ShowString(1, 1, "AX:");
-    OLED_ShowString(1, 9, "AY:");
-    OLED_ShowString(2, 1, "AZ:");
-    OLED_ShowString(2, 9, "GX:");
-    OLED_ShowString(3, 1, "GY:");
-    OLED_ShowString(3, 9, "GZ:");
-
-    // 测试程序 i2c是否正确运行
-    /*
-    OLED_ShowString(1, 1, "ID:");
-    ID = MPU6050_GetID();
-    OLED_ShowHexNum(1, 4, ID, 2);
-    Delay_ms(2000);
-    */
+    OLED_ShowString(1, 1,  "MPU6050姿态角", OLED_8X16);
+    OLED_ShowString(1, 16, "俯仰角:", OLED_8X16);
+    OLED_ShowString(1, 32, "翻滚角:", OLED_8X16);
+    OLED_ShowString(1, 48, "偏航角:", OLED_8X16);
+    OLED_Update();
 }
 
 void OLED_MPU6050CycleDisplay()
 {
-
-    // 取消注释这些行来显示加速度计、温度、陀螺仪数据   
-    /*  
-    OLED_ShowSignedNum(1, 4, (int32_t)(AccData[0] * 100), 4); // X轴加速度  
-    OLED_ShowSignedNum(1, 12, (int32_t)(AccData[1] * 100), 4); // Y轴加速度  
-    OLED_ShowSignedNum(2, 4, (int32_t)(AccData[2] * 100), 4); // Z轴加速度  
-    OLED_ShowSignedNum(4, 7, (int32_t)(Temperature * 100), 4); // 温度  
-    OLED_ShowSignedNum(2, 12, (int32_t)(GyroData[0] * 100), 4); // X轴陀螺仪  
-    OLED_ShowSignedNum(3, 4, (int32_t)(GyroData[1] * 100), 4); // Y轴陀螺仪  
-    OLED_ShowSignedNum(3, 12, (int32_t)(GyroData[2] * 100), 4); // Z轴陀螺仪  
-    */  
-
-   // 显示角度，这里假设使用GyroX、GyroY和GyroZ来代表角度  
-   OLED_ShowSignedNum(2,12,(uint32_t)(MPU6050_Data.GyroX),4);
-   OLED_ShowSignedNum(3,4,(uint32_t)(MPU6050_Data.GyroY),4);
-   OLED_ShowSignedNum(3,12,(uint32_t)(MPU6050_Data.GyroZ),4);
+    // 清空数值区域（原X:56~127 → 现57~128，但最大127所以调整为57~127）
+    OLED_ClearArea(57, 16, 71, 48);
+    
+    // 显示浮点数（格式：+xxx.xx，保留2位小数）
+    OLED_ShowFloatNum(57, 16, MPU6050_Angle.X_Angle, 3, 2, OLED_8X16);
+    OLED_ShowFloatNum(57, 32, MPU6050_Angle.Y_Angle, 3, 2, OLED_8X16);
+    OLED_ShowFloatNum(57, 48, MPU6050_Angle.Z_Angle, 3, 2, OLED_8X16);
+    
+    // 局部更新数据区域（宽度71保证不超128）
+    OLED_UpdateArea(57, 16, 71, 48);
 }
 
 // 使用OLED测试串口是否正常使用 最好发2位 不然OLED挤不下一行
@@ -280,16 +338,13 @@ void Serial_change()
     if(oled_rxClear_flag)
     {
         oled_rxClear_flag=0;
-        OLED_ClearLine(4);  // 清除第4行
+        
     }
     if (!Serial_RxFlag1) {
         return; // 没有新数据时直接返回
     }
     if (Serial_RxFlag1) {
         // 将接收到的数据通过串口回显
-        OLED_ClearLine(4);
-        OLED_ShowString(4, 1, Serial_RxPacket1);
-
         if (strcmp(Serial_RxPacket1, "TargetA add") == 0) {
             TargetA += 10;
         }
@@ -455,17 +510,15 @@ int main(void){
             MPU6050_ReadReg(&MPU6050_Data);
             MPU6050_CalculateAngle(&MPU6050_Data);
             angle_temp=MPU6050_Angle.Y_Angle;
-            if (angle_temp < -50 || angle_temp > 60) // 角度异常
+            if (angle_temp < -50 || angle_temp > 50) // 角度异常
             {
                 MPU6050_Angle.Y_Angle=0;
-                TIM_Cmd(TIM2,DISABLE);
                 MotorA_SetSpeed(0);
                 MotorB_SetSpeed(0);
                 PID_Angle_Clear(&pidA_inner);
                 PID_Angle_Clear(&pidB_inner);
                 PID_Angle_Clear(&pidA_outer);
-                PID_Angle_Clear(&pidA_outer);
-                TIM_Cmd(TIM2,ENABLE);
+                PID_Angle_Clear(&pidA_outer); 
             }
             mpu6050_timingFlag=0;
         }
@@ -512,9 +565,9 @@ int main(void){
 
 
 // 使用 static 关键字使 Count 保持其值
-void TIM2_IRQHandler(void)
+void TIM1_UP_IRQHandler(void)
 {
-    if (TIM_GetITStatus(TIM2, TIM_IT_Update) == SET) 
+    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) 
     {
         if(++mpu6050_count == 3)//3ms
         {
@@ -535,10 +588,44 @@ void TIM2_IRQHandler(void)
             oled_rxClear_count=0;
             oled_rxClear_flag=1;
         }
-    }
+        if(++oled_BufClear_count==50)//50ms
+        {
+            oled_BufClear_count=0;
+            oled_BufClear_flag=1;
+        }
+        if(++oled_BufDisplay_count==20)//100ms
+        {
+            oled_BufDisplay_count=0;
+            oled_BufDisplay_flag=1;
+        }
+        if(++oled_BufDisplayOne_count==6)//57ms
+        {
+            oled_BufDisplayOne_count=0;
+            oled_BufDisplayOne_flag=1;
+        }
+        if(++oled_BufDisplayTwo_count==12)//67ms
+        {
+            oled_BufDisplayTwo_count=0;
+            oled_BufDisplayTwo_flag=1;
+        }
+        if(++oled_BufDisplayThree_count==18)//77ms
+        {
+            oled_BufDisplayThree_count=0;
+            oled_BufDisplayThree_flag=1;
+        }
         // 确保清除中断标志，避免重复触发
-        TIM_ClearITPendingBit(TIM2, TIM_IT_Update); // 根据您的定时器和情况调整
+        TIM_ClearITPendingBit(TIM1, TIM_IT_Update);// 根据您的定时器和情况调整
+    }
 }
-
+/*
+void TIM1_UP_IRQHandler(void)
+{
+	if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
+	{
+		
+		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+	}
+}
+*/
 
 

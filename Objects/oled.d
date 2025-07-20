@@ -29,3 +29,9 @@
 .\objects\oled.o: .\Library\stm32f10x_wwdg.h
 .\objects\oled.o: .\Library\misc.h
 .\objects\oled.o: Hardware\OLED_Font.h
+.\objects\oled.o: .\System\Delay.h
+.\objects\oled.o: Hardware\OLED.h
+.\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h

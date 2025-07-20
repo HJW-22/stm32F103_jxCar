@@ -203,6 +203,9 @@
             "path": "Hardware/OLED.h"
           },
           {
+            "path": "Hardware/OLED_Font.c"
+          },
+          {
             "path": "Hardware/OLED_Font.h"
           },
           {
@@ -255,6 +258,12 @@
           },
           {
             "path": "System/Delay.h"
+          },
+          {
+            "path": "System/Timer.h"
+          },
+          {
+            "path": "System/Timer.c"
           }
         ],
         "folders": []

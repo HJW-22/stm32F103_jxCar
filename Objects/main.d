@@ -39,3 +39,5 @@
 .\objects\main.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
 .\objects\main.o: .\Hardware\MPU6050.h
 .\objects\main.o: .\Hardware\PID_Positional.h
+.\objects\main.o: .\Hardware\OLED_Font.h
+.\objects\main.o: .\System\Timer.h

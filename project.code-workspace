@@ -4,6 +4,12 @@
             "path": "."
         }
     ],
-    "settings": {},
+    "settings": {
+        "files.associations": {
+            "stm32f10x.h": "c",
+            "oled_font.h": "c",
+            "string.h": "c"
+        }
+    },
     "extensions": {}
 }

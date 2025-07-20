@@ -12,7 +12,7 @@ void Motor_Init(void)
 		GPIO_InitStructure.GPIO_Speed=GPIO_Speed_50MHz;
 		GPIO_Init(GPIOB,&GPIO_InitStructure);
 		PWM_init();
-		TIM2_NVIC_Init();
+		//TIM2_NVIC_Init();
 }
 
 
