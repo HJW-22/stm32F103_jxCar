@@ -1,5 +1,5 @@
-#ifndef __OLED_H
-#define __OLED_H
+#ifndef __OLED_H__
+#define __OLED_H__
 #include "stm32f10x.h"                  // Device header
 
 /*FontSize参数取值*/

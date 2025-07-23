@@ -1,5 +1,5 @@
-#ifndef __MPU6050_H
-#define __MPU6050_H
+#ifndef __MPU6050_H__
+#define __MPU6050_H__
 
 #include "stm32f10x.h"                  // Device header
 
@@ -14,7 +14,7 @@ typedef struct
     int16_t GyroX;  
     int16_t GyroY;  
     int16_t GyroZ;  
-} MPU6050_DataTypeDef;  
+} MPU6050_OriginalData;  
 
 typedef struct   
 {  
@@ -28,21 +28,39 @@ typedef enum {
     MPU_READ_REQUESTED, //读取MPU6050请求
     MPU_DMA_READING,    //读取MPU6050寄存器中
     MPU_DATA_READY      //准备被DMA读取
-} MPU6050_State_t;
+} MPU6050_StateData;
 
-extern volatile MPU6050_State_t MPU6050_State;
-extern MPU6050_DataTypeDef MPU6050_Data;
-extern MPU6050_AngleData MPU6050_Angle;
+typedef enum {
+    MPU_ALL,           
+    MPU_TEMP, 
+    MPU_Y,   
+    MPU_X,
+    MPU_Z
+} MPU6050_GetOriginalType;
 
+typedef enum {
+    MPU_ALL,           
+    MPU_TEMP, 
+    MPU_Y,   
+    MPU_X,
+    MPU_Z
+} MPU6050_GetCalculateType;
+
+extern MPU6050_StateData    MPU6050_State;
+extern MPU6050_OriginalData MPU6050_Data;
+extern MPU6050_AngleData    MPU6050_Angle;
+
+void MPU6050_Init(void); 
+uint8_t MPU6050_GetID(void);
+void MPU6050_WriteReg(uint8_t RegAddress,int8_t Data);
+void MPU6050_ReadReg(MPU6050_OriginalData* DataStruct);
+void MPU6050_CalculateAngle(MPU6050_OriginalData *MPU6050_Original,MPU6050_AngleData *MPU6050_Angle);
+
+
+
+void MPU6050_DMA_Init(void); 
 void MPU6050_DMA_Read(void);
 uint8_t MPU6050_DMA_IsDataReady(void);
-void MPU6050_WriteReg(uint8_t RegAddress,int8_t Data);
-void MPU6050_ReadReg(MPU6050_DataTypeDef* DataStruct);
-void MPU6050_Init(void); 
-void MPU6050_ConvertData(MPU6050_DataTypeDef* RawData,float* AccData,float* GyroData,float* Temperature);  
-void MPU6050_CalculateAngle(MPU6050_DataTypeDef* DataStruct);
-uint8_t MPU6050_GetID(void);
-void MPU6050_DMA_Init(void); 
 
 
 #endif

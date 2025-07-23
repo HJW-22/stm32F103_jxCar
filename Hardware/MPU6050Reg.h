@@ -1,3 +1,6 @@
+#ifndef __MPU6050Reg_H__
+#define __MPU6050Reg_H__
+
 // MPU6050 寄存器地址定义  
 #define MPU6050_SMPLRT_DIV      0x19    // 采样率分频寄存器  
 #define MPU6050_CONFIG          0x1A    // 配置寄存器  
@@ -48,3 +51,7 @@
 #define MPU6050_ACCEL_FS_16G        0x18    // ±16g  
 
 #define	MPU6050_WHO_AM_I		0x75
+
+
+
+#endif

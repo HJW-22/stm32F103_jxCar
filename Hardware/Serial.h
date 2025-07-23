@@ -1,5 +1,5 @@
-#ifndef __Serial_H
-#define __Serial_H
+#ifndef __Serial_H__
+#define __Serial_H__
 
 #include "stm32f10x.h"                  // Device header
 #include <stdio.h>

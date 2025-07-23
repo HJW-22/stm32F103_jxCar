@@ -617,15 +617,6 @@ void TIM1_UP_IRQHandler(void)
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);// 根据您的定时器和情况调整
     }
 }
-/*
-void TIM1_UP_IRQHandler(void)
-{
-	if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
-	{
-		
-		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
-	}
-}
-*/
+
 
 
