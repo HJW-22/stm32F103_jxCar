@@ -11,6 +11,7 @@
 #include "OLED_Font.h"
 #include "Timer.h"
 
+MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 
 #define MOTORA_DEBUG
 // #define MOTORB_DEBUG
@@ -65,6 +66,8 @@
     PID_AngleParam pidA_inner,pidB_inner;
     PID_AngleParam pidA_outer,pidB_outer;
 #endif
+
+
 /*typec方向左B2TIM2 右A1TIM3
 电机的插线反了 即PWMA代表的是电机B
 即PWMB代表的是电机A
@@ -106,24 +109,11 @@ uint8_t mpu6050_errorFlag;
 
 //   ------------------定时器计次位------------------
 uint16_t pid_count = 0;
-uint16_t oled_rxClear_count=0;
 uint8_t oled_rxClear_flag=0;
-
-
-uint16_t oled_BufClear_count=0;
 uint8_t oled_BufClear_flag=0;
-
-
-uint16_t oled_BufDisplay_count=0;
 uint8_t oled_BufDisplay_flag=0;
-
-uint16_t oled_BufDisplayOne_count=0;
 uint8_t oled_BufDisplayOne_flag=0;
-
-uint16_t oled_BufDisplayThree_count=0;
 uint8_t oled_BufDisplayThree_flag=0;
-
-uint16_t oled_BufDisplayTwo_count=0;
 uint8_t oled_BufDisplayTwo_flag=0;
 
 
@@ -140,20 +130,72 @@ float angle_temp=0;
 
 int16_t Angle_Get()
 {
-return ((-angle_temp));
+    return ((-angle_temp)+3.3);
 }
 
+//Tout=((4×2^PR) ×RLR)/LSI时钟频率
+void IWDG_Config(uint8_t prv ,uint16_t rlv)
+{	
+	/* 使能 预分频寄存器PR和重装载寄存器RLR可写 */
+	IWDG_WriteAccessCmd( IWDG_WriteAccess_Enable );
+	
+	/* 设置预分频器值 */
+	IWDG_SetPrescaler( prv );
+	
+	/* 设置重装载寄存器值 */
+	IWDG_SetReload( rlv );
+	
+	/* 把重装载寄存器的值放到计数器中 */
+	IWDG_ReloadCounter();
+	
+	/* 使能 IWDG */
+	IWDG_Enable();	
+
+}
+
+
+/**
+  * 函数功能: 喂狗
+  */
+void IWDG_Feed(void)
+{
+	/* 把重装载寄存器的值放到计数器中，喂狗，防止IWDG复位
+	   当计数器的值减到0的时候会产生系统复位 */
+	IWDG_ReloadCounter();
+}
+
+void LED_Init()
+{
+    PWR_BackupAccessCmd(ENABLE);//允许修改RTC 和后备寄存器
+
+	RCC_LSEConfig(RCC_LSE_OFF);//关闭外部低速外部时钟信号功能 后，PC13 PC14 PC15 才可以当普通IO用。
+
+	BKP_TamperPinCmd(DISABLE);//关闭入侵检测功能，也就是 PC13，也可以当普通IO 使用
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC,ENABLE);
+    GPIO_InitTypeDef GPIO_InitStart;
+    GPIO_InitStart.GPIO_Pin=GPIO_Pin_13;
+    GPIO_InitStart.GPIO_Mode=GPIO_Mode_Out_PP;
+    GPIO_InitStart.GPIO_Speed=GPIO_Speed_50MHz;
+    GPIO_Init(GPIOC,&GPIO_InitStart);
+
+}
 void Main_Config()
 {
+    OLED_Init();
+    OLED_ShowString( (128-96)/2, (64-16)/2, "系统初始化中", OLED_8X16);
+    OLED_Update();
     Serial_Init(); 
     Motor_Init();
     Encoder_TIM4_Init();
     Encoder_TIM3_Init();
-    MPU6050_Init();
-    OLED_Init();
+    MPU6050_Init(GPIOB,GPIO_Pin_10,GPIO_Pin_11);
     USART2_DMA_Init();
     Timer_Init();
-//    MPU6050_DMA_Init();
+    // LED_Init();
+
+
+
 
     #ifdef SETLOACTION_MODE
     // 初始化电机A的PID
@@ -171,11 +213,11 @@ void Main_Config()
     #endif // DUALCONTROL_MODE
 
     #ifdef ANGLE_MODE
-    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3.5,0.01,1,-100,100,MotorA_SetSpeed);
-    // PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.1,0,20,-100,100,NULL);
+    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3,0,0,-80,80,MotorA_SetSpeed);
+    // PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.004,0,0.8,-100,100,NULL);
 
-    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3.5,0.01,1,-100,100,MotorB_SetSpeed);
-    // PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.1,0,20,-100,100,NULL);
+    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3,0,0,-80,80,MotorB_SetSpeed);
+    // PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.004,0,0.8,-100,100,NULL);
     #endif
 }
 
@@ -202,15 +244,6 @@ void OLED_PIDDisplay()
 
 void OLED_PIDCycleDisplay()
 {
-    //此函数需要10ms 要缩短到3ms以内
-    //100ms显示1次
-    // if (oled_BufClear_flag)
-    // {
-    //     OLED_ClearArea(40,16,40,48);
-    //     OLED_ClearArea(104,16,24,48);
-    //     oled_BufClear_flag=0;
-    // }
-
      if (oled_BufDisplayOne_flag)
     {
         OLED_ShowSignedNum(40, 16, ActualA, 4,OLED_8X16);
@@ -235,38 +268,46 @@ void OLED_PIDCycleDisplay()
         OLED_UpdateArea(104,16,24,48);
         oled_BufDisplay_flag=0;
     }
-   
-  
 }
 
 void OLED_MPU6050Display()
 {
     OLED_Clear();
-    OLED_ShowString(1, 1,  "MPU6050姿态角", OLED_8X16);
-    OLED_ShowString(1, 16, "俯仰角:", OLED_8X16);
-    OLED_ShowString(1, 32, "翻滚角:", OLED_8X16);
-    OLED_ShowString(1, 48, "偏航角:", OLED_8X16);
+    OLED_ShowString(0, 0,  "MPU6050姿态角", OLED_8X16);
+    OLED_ShowString(0, 16, "俯仰角:", OLED_8X16);
+    OLED_ShowString(0, 32, "翻滚角:", OLED_8X16);
+    OLED_ShowString(0, 48, "偏航角:", OLED_8X16);
     OLED_Update();
 }
 
 void OLED_MPU6050CycleDisplay()
 {
-    // 清空数值区域（原X:56~127 → 现57~128，但最大127所以调整为57~127）
-    OLED_ClearArea(57, 16, 71, 48);
-    
-    // 显示浮点数（格式：+xxx.xx，保留2位小数）
-    OLED_ShowFloatNum(57, 16, MPU6050_Angle.X_Angle, 3, 2, OLED_8X16);
-    OLED_ShowFloatNum(57, 32, MPU6050_Angle.Y_Angle, 3, 2, OLED_8X16);
-    OLED_ShowFloatNum(57, 48, MPU6050_Angle.Z_Angle, 3, 2, OLED_8X16);
-    
-    // 局部更新数据区域（宽度71保证不超128）
-    OLED_UpdateArea(57, 16, 71, 48);
+    if (oled_BufDisplayOne_flag)
+    {
+        OLED_ShowFloatNum(54, 16, MPU6050_Data.pitch, 3, 2, OLED_8X16);
+        oled_BufDisplayOne_flag=0;
+    }
+    if (oled_BufDisplayTwo_flag)
+    {
+        OLED_ShowFloatNum(54, 32, MPU6050_Data.roll, 3, 2, OLED_8X16);
+        oled_BufDisplayTwo_flag=0;
+    }
+    if (oled_BufDisplayThree_flag)
+    {
+        OLED_ShowFloatNum(54, 48, MPU6050_Data.yaw, 3, 2, OLED_8X16);
+        oled_BufDisplayThree_flag=0;
+    }
+    if (oled_BufDisplay_flag)
+    {
+        // 局部更新数据区域（宽度71保证不超128）
+        OLED_UpdateArea(54, 16, 74, 48);
+        oled_BufDisplay_flag=0;
+    }
 }
 
 // 使用OLED测试串口是否正常使用 最好发2位 不然OLED挤不下一行
-void OLED_SerialDisplay()
+void OLED_SerialSend()
 {
-
     #ifdef USART1_FLAG
     Serial_Printf(USART1, "串口1初始化成功！\n");
     #endif // USART1_FLAG
@@ -277,39 +318,10 @@ void OLED_SerialDisplay()
 
     #ifdef USART3_FLAG
     Serial_Printf(USART3, "串口3初始化成功！\n");
-    #endif // USART3_FLAG
-
-    // 测试程序
-    /*
-    OLED_ShowString(4,1,"TX1");
-    OLED_ShowString(4,5,"TX2");
-    OLED_ShowString(4,10,"TX3");
-    if(Serial_RxFlag1)
-    {
-         // 将接收到的数据通过串口回显
-         OLED_ShowString(4,3," ");
-         OLED_ShowString(4,3,Serial_RxPacket1);
-         Serial_RxFlag1 = 0;  // 重置接收标志
-    }
-    if(Serial_RxFlag2)
-    {
-         // 将接收到的数据通过串口回显
-         OLED_ShowString(4,8,"  ");
-         OLED_ShowString(4,8,Serial_RxPacket2);
-         Serial_RxFlag2 = 0;  // 重置接收标志
-    }
-
-   if(Serial_RxFlag3)
-    {
-         // 将接收到的数据通过串口回显
-         OLED_ShowString(4,13," ");
-         OLED_ShowString(4,13,Serial_RxPacket3);
-         Serial_RxFlag3 = 0;  // 重置接收标志
-    }
-    */
+    #endif // USART3_FLAG 
 }
 
-void OLED_SerialCycleDisplay()
+void OLED_PIDCycleSend()
 {
     static char buffer[32];
 
@@ -330,6 +342,11 @@ void OLED_SerialCycleDisplay()
     
     // 发送格式化数据  
     USART2_DMA_Send((uint8_t *)buffer, len);  
+}
+//0.0016
+void OLED_MPU6050CycleSend()
+{
+    Serial_Printf(USART2,"%.3f,%.3f,%.3f\n",MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
 }
 
 void Serial_change()
@@ -486,44 +503,34 @@ void MotorControlLoop_Angle() {
 int main(void){
     Delay_ms(100);
     Main_Config();
+    //10ms看门
+    IWDG_Config(IWDG_Prescaler_16,25);
     while (1) {
         if (page1_flag) {
             if (page1_firstEntry) {
                 OLED_PIDDisplay();
-                OLED_SerialDisplay();
+                OLED_SerialSend();
                 page1_firstEntry = 0;
             } else {
                 OLED_PIDCycleDisplay();
-                OLED_SerialCycleDisplay();
+                OLED_PIDCycleSend();
             }
         } else if (page2_flag) {
             if (page2_firstEntry) {
                 OLED_MPU6050Display();
+                OLED_SerialSend();
                 page2_firstEntry = 0;
             } else {
                OLED_MPU6050CycleDisplay();
+               OLED_MPU6050CycleSend();
             }
-        }
-
-        if (mpu6050_timingFlag)
-        {
-            MPU6050_ReadReg(&MPU6050_Data);
-            MPU6050_CalculateAngle(&MPU6050_Data);
-            angle_temp=MPU6050_Angle.Y_Angle;
-            if (angle_temp < -50 || angle_temp > 50) // 角度异常
-            {
-                MPU6050_Angle.Y_Angle=0;
-                MotorA_SetSpeed(0);
-                MotorB_SetSpeed(0);
-                PID_Angle_Clear(&pidA_inner);
-                PID_Angle_Clear(&pidB_inner);
-                PID_Angle_Clear(&pidA_outer);
-                PID_Angle_Clear(&pidA_outer); 
-            }
-            mpu6050_timingFlag=0;
         }
         if (pid_timingFlag)
         {
+            //0.00085
+            MPU6050_Get_Angle_Plus(&MPU6050_Data);
+
+            angle_temp=MPU6050_Data.pitch;
             #ifdef SETLOACTION_MODE
             MotorControlLoop_SetLoaction();
             #endif // SETLOACTION_MODE
@@ -537,29 +544,9 @@ int main(void){
             #endif // ANGLE_MODE
             pid_timingFlag=0;
         }
-
-        
-
-        // switch (MPU6050_State) {
-        //     case MPU_READ_REQUESTED:
-        //         MPU6050_DMA_Read();
-        //         MPU6050_State = MPU_DMA_READING; // 进入DMA等待状态
-        //         break;
-        
-        //     case MPU_DATA_READY:
-        //         MPU6050_CalculateAngle(&MPU6050_Data);
-        //         // 执行控制逻辑（如PID）
-        //         MPU6050_State = MPU_IDLE; // 处理完成后回到空闲
-        //         break;
-        
-        //     case MPU_DMA_READING: // 无需操作，等待DMA中断
-        //     case MPU_IDLE:        // 无操作
-        //     default:
-        //         break;
-        // }
-
-        // 串口改变目标值
+        //串口改变目标值
         Serial_change();
+        IWDG_Feed();
     }
 }
 
@@ -567,53 +554,30 @@ int main(void){
 // 使用 static 关键字使 Count 保持其值
 void TIM1_UP_IRQHandler(void)
 {
+    static uint16_t sys_cnt=0;
     if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) 
     {
-        if(++mpu6050_count == 3)//3ms
+        sys_cnt++;
+        if(sys_cnt % 10 == 0)pid_timingFlag=1;
+
+        if(sys_cnt % 24 == 0)oled_BufDisplay_flag=1;
+        if(sys_cnt % 6 == 0)oled_BufDisplayOne_flag=1;
+        if(sys_cnt % 12 == 0)oled_BufDisplayTwo_flag=1;
+        if(sys_cnt % 18 == 0)oled_BufDisplayThree_flag=1;
+        //测试可行性,1s 闪烁led(pc13)
+        if(sys_cnt % 1000 == 0)
         {
-            mpu6050_count=0;
-            mpu6050_timingFlag=1;
-            // 仅触发读取请求，不阻塞中断
-            // if (MPU6050_State == MPU_IDLE) {
-            //     MPU6050_State = MPU_READ_REQUESTED;
-            // }
+            // if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == Bit_SET )
+            // {
+            //     GPIO_WriteBit(GPIOC, GPIO_Pin_13 ,Bit_RESET); // 翻转 PA0
+            // }else
+            // {
+            //     GPIO_WriteBit(GPIOC, GPIO_Pin_13 ,Bit_SET); // 翻转 PA0
+            // } 
+        
         }
-        if(++pid_count == 5)//5ms
-        {
-            pid_count = 0; // 重置计数器，以便下次计算
-            pid_timingFlag=1;
-        }
-        if(++oled_rxClear_count==3000)//3000ms
-        {
-            oled_rxClear_count=0;
-            oled_rxClear_flag=1;
-        }
-        if(++oled_BufClear_count==50)//50ms
-        {
-            oled_BufClear_count=0;
-            oled_BufClear_flag=1;
-        }
-        if(++oled_BufDisplay_count==20)//100ms
-        {
-            oled_BufDisplay_count=0;
-            oled_BufDisplay_flag=1;
-        }
-        if(++oled_BufDisplayOne_count==6)//57ms
-        {
-            oled_BufDisplayOne_count=0;
-            oled_BufDisplayOne_flag=1;
-        }
-        if(++oled_BufDisplayTwo_count==12)//67ms
-        {
-            oled_BufDisplayTwo_count=0;
-            oled_BufDisplayTwo_flag=1;
-        }
-        if(++oled_BufDisplayThree_count==18)//77ms
-        {
-            oled_BufDisplayThree_count=0;
-            oled_BufDisplayThree_flag=1;
-        }
-        // 确保清除中断标志，避免重复触发
+
+        
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);// 根据您的定时器和情况调整
     }
 }

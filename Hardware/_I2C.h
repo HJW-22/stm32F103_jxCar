@@ -1,6 +1,6 @@
 #ifndef __I2C_H__
 #define __I2C_H__
-
+#include "stm32f10x.h"
 #define SI2C_delay_time 0																			//设置硬件I2C的延时速度
 #define I2C(obj) (Pthis_I2C = &obj)																	//Pthis全局指针宏定义
 typedef struct I2C_Private I2C_Private;		

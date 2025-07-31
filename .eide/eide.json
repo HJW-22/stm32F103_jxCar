@@ -233,9 +233,6 @@
             "path": "Hardware/MPU6050.h"
           },
           {
-            "path": "Hardware/MPU6050Reg.h"
-          },
-          {
             "path": "Hardware/PID_Positional.c"
           },
           {
@@ -246,6 +243,12 @@
           },
           {
             "path": "Hardware/Serial.h"
+          },
+          {
+            "path": "Hardware/_I2C.h"
+          },
+          {
+            "path": "Hardware/_I2C.c"
           }
         ],
         "folders": []

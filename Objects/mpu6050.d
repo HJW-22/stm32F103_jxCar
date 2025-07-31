@@ -28,7 +28,6 @@
 .\objects\mpu6050.o: .\Library\stm32f10x_usart.h
 .\objects\mpu6050.o: .\Library\stm32f10x_wwdg.h
 .\objects\mpu6050.o: .\Library\misc.h
-.\objects\mpu6050.o: Hardware\MPU6050Reg.h
 .\objects\mpu6050.o: Hardware\MPU6050.h
 .\objects\mpu6050.o: .\System\Delay.h
 .\objects\mpu6050.o: Hardware\Serial.h
@@ -36,3 +35,4 @@
 .\objects\mpu6050.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
 .\objects\mpu6050.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\objects\mpu6050.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\objects\mpu6050.o: Hardware\_I2C.h

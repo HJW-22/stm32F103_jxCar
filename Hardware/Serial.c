@@ -25,7 +25,6 @@ void Serial_Init(void)
 	GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     #ifdef USART1_FLAG
     
 	  //------------------- 串口1初始化 --------------------
@@ -83,7 +82,7 @@ void Serial_Init(void)
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 	USART_StructInit(&USART_InitStructure);
-	USART_InitStructure.USART_BaudRate = 9600;                          //波特率
+	USART_InitStructure.USART_BaudRate = 115200;                          //波特率
 	USART_InitStructure.USART_WordLength = USART_WordLength_8b;         //8位数据位
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;              //停止位1
 	USART_InitStructure.USART_Parity = USART_Parity_No;                 //无奇偶校验
@@ -194,6 +193,26 @@ void Serial_SendString(char *String, USART_TypeDef *USARTx){
         Serial_SendByte(String[i], USARTx);  
     }  
 }  
+
+
+#pragma import(__use_no_semihosting)
+//标准库需要的支持函数                 
+struct __FILE 
+{ 
+	int handle; 
+};
+
+void _ttywrch(int ch)
+{
+       // 空实现，避免半主机模式相关的引用错误
+}
+
+FILE __stdout;       
+//定义_sys_exit()以避免使用半主机模式    
+void _sys_exit(int x) 
+{ 
+	x = x; 
+} 
 
 //重定向打印
 void Serial_Printf(USART_TypeDef *USARTx,  char *format, ...)  

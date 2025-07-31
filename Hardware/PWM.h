@@ -9,9 +9,9 @@ void TIM2_NVIC_Init(void);
 //PWM的频率   =72MHz/PSC/ARR
 //PWM的占空比 =CCR/ARR 
 
-//默认1000hz 占空比为0
+//默认10000hz 占空比为0
 #define ARR 100-1
-#define PSC 720-1 
+#define PSC 72-1 
 #define CCR 0
 
 
