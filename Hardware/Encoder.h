@@ -1,6 +1,5 @@
 #ifndef __Encoder_H__
 #define __Encoder_H__
-#include "stm32f10x.h"                  // Device header
 
 void Encoder_TIM4_Init(void);
 void Encoder_TIM3_Init(void);

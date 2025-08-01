@@ -249,6 +249,12 @@
           },
           {
             "path": "Hardware/_I2C.c"
+          },
+          {
+            "path": "Hardware/IWDG.h"
+          },
+          {
+            "path": "Hardware/IWDG.c"
           }
         ],
         "folders": []

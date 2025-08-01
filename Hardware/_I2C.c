@@ -259,6 +259,20 @@ uint16_t _I2C_ReadReg(uint8_t RegAddress)
    }
 }
 
+uint16_t _I2C_Read_Reg_continue()
+{
+
+
+
+}
+
+
+uint16_t _I2C_Write_Reg_continue()
+{
+
+
+
+}
 
 //------------------------I2C创建部分------------------------
 /*

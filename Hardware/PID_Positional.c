@@ -50,11 +50,8 @@ void PID_Init_BicyclicParams( uint8_t name,PID_BicyclicParams *pid,  int16_t (*G
     pid->outMin=outMin;
 
     // 初始化目标值、实际值和输出  
-    pid->target = 0;  
     pid->target = 0;   
     pid->actual = 0;  
-    pid->actual = 0;  
-    pid->output = 0;  
     pid->output = 0;  
 
     // 清零状态  
@@ -276,11 +273,8 @@ void PID_Init_Angle( uint8_t name, PID_AngleParam *pid, int16_t (*GetPWM)(void),
     pid->outMin=outMin;
 
     // 初始化目标值、实际值和输出  
-    pid->target = 0;  
     pid->target = 0;   
     pid->actual = 0;  
-    pid->actual = 0;  
-    pid->output = 0;  
     pid->output = 0;  
 
     // 清零状态  
@@ -290,11 +284,8 @@ void PID_Init_Angle( uint8_t name, PID_AngleParam *pid, int16_t (*GetPWM)(void),
 void PID_Angle_Clear(PID_AngleParam *pid)
 {
     // 初始化目标值、实际值和输出  
-    pid->target = 0;  
     pid->target = 0;   
     pid->actual = 0;  
-    pid->actual = 0;  
-    pid->output = 0;  
     pid->output = 0;  
     motorA_speed=0;
     motorB_speed=0;

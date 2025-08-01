@@ -10,11 +10,22 @@
 #include "PID_Positional.h"
 #include "OLED_Font.h"
 #include "Timer.h"
+#include "IWDG.h"
+
 
 MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 
+
+
+//电机A调试还是电机B调试(仅串口2发送无oled)
 #define MOTORA_DEBUG
 // #define MOTORB_DEBUG
+
+//双环pid选项内环还是外环调试(用于调参串口2)
+#define INNER_DEBUG        //内部
+// #define OUTER_DEBUG     //外部
+
+
 
 
 //PID_Init
@@ -22,8 +33,10 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 //PID_Init_Angle
 
 // #define SETLOACTION_MODE
-//#define DUALCONTROL_MODE
+// #define DUALCONTROL_MODE
 #define ANGLE_MODE
+
+
 
 
 /* 128x64 数字符号为8x16 中文为16x16
@@ -48,6 +61,14 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
         #error "MOTORA_DEBUG and MOTORB_DEBUG cannot be defined at the same time!"
     #endif
 #endif
+
+
+#ifdef INNER_DEBUG
+    #ifdef OUTER_DEBUG
+        #error "INNER_DEBUG and OUTER_DEBUG cannot be defined at the same time!"
+    #endif
+#endif
+
 
 #if (defined(SETLOACTION_MODE) + defined(DUALCONTROL_MODE) + defined(ANGLE_MODE)) > 1
     #error "Only one of SETLOACTION_MODE, DUALCONTROL_MODE, or ANGLE_MODE can be defined!"
@@ -133,36 +154,7 @@ int16_t Angle_Get()
     return ((-angle_temp)+3.3);
 }
 
-//Tout=((4×2^PR) ×RLR)/LSI时钟频率
-void IWDG_Config(uint8_t prv ,uint16_t rlv)
-{	
-	/* 使能 预分频寄存器PR和重装载寄存器RLR可写 */
-	IWDG_WriteAccessCmd( IWDG_WriteAccess_Enable );
-	
-	/* 设置预分频器值 */
-	IWDG_SetPrescaler( prv );
-	
-	/* 设置重装载寄存器值 */
-	IWDG_SetReload( rlv );
-	
-	/* 把重装载寄存器的值放到计数器中 */
-	IWDG_ReloadCounter();
-	
-	/* 使能 IWDG */
-	IWDG_Enable();	
 
-}
-
-
-/**
-  * 函数功能: 喂狗
-  */
-void IWDG_Feed(void)
-{
-	/* 把重装载寄存器的值放到计数器中，喂狗，防止IWDG复位
-	   当计数器的值减到0的时候会产生系统复位 */
-	IWDG_ReloadCounter();
-}
 
 void LED_Init()
 {
@@ -178,23 +170,25 @@ void LED_Init()
     GPIO_InitStart.GPIO_Mode=GPIO_Mode_Out_PP;
     GPIO_InitStart.GPIO_Speed=GPIO_Speed_50MHz;
     GPIO_Init(GPIOC,&GPIO_InitStart);
-
 }
+
+
 void Main_Config()
 {
     OLED_Init();
     OLED_ShowString( (128-96)/2, (64-16)/2, "系统初始化中", OLED_8X16);
     OLED_Update();
+    Delay_ms(800);
+
     Serial_Init(); 
     Motor_Init();
     Encoder_TIM4_Init();
     Encoder_TIM3_Init();
-    MPU6050_Init(GPIOB,GPIO_Pin_10,GPIO_Pin_11);
     USART2_DMA_Init();
-    Timer_Init();
     // LED_Init();
 
-
+    MPU6050_Init(GPIOB,GPIO_Pin_10,GPIO_Pin_11);
+    Timer_Init();
 
 
     #ifdef SETLOACTION_MODE
@@ -205,19 +199,39 @@ void Main_Config()
     #endif // SETLOACTION_MODE
     
     #ifdef DUALCONTROL_MODE
-    PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
-    PID_Init_BicyclicParams(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
 
+   
+    #ifdef INNER_DEBUG
+    PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
     PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM4_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
+    #endif // INNER_DEBUG
+
+    //一般来说如果单环的参数不可以使用到双环内
+    #ifdef OUTER_DEBUG
+    PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
+    PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM4_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
+    PID_Init_BicyclicParams(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
     PID_Init_BicyclicParams(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
+    #endif // OUTER_DEBUG
+
     #endif // DUALCONTROL_MODE
 
     #ifdef ANGLE_MODE
-    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3,0,0,-80,80,MotorA_SetSpeed);
-    // PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.004,0,0.8,-100,100,NULL);
 
+
+    #ifdef INNER_DEBUG
+    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3,0,0,-80,80,MotorA_SetSpeed);
     PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3,0,0,-80,80,MotorB_SetSpeed);
-    // PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.004,0,0.8,-100,100,NULL);
+    #endif // INNER_DEBUG
+   
+    //一般来说如果单环的参数不可以使用到双环内
+    #ifdef OUTER_DEBUG
+    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3,0,0,-80,80,MotorA_SetSpeed);
+    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3,0,0,-80,80,MotorB_SetSpeed);
+    PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.004,0,0.8,-100,100,NULL);
+    PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.004,0,0.8,-100,100,NULL);
+    #endif // OUTER_DEBUG
+   
     #endif
 }
 
@@ -277,7 +291,8 @@ void OLED_MPU6050Display()
     OLED_ShowString(0, 16, "俯仰角:", OLED_8X16);
     OLED_ShowString(0, 32, "翻滚角:", OLED_8X16);
     OLED_ShowString(0, 48, "偏航角:", OLED_8X16);
-    OLED_Update();
+    OLED_UpdateArea(0, 0, 104, 16);
+    OLED_UpdateArea(0, 16, 56, 48);
 }
 
 void OLED_MPU6050CycleDisplay()
@@ -428,6 +443,7 @@ void MotorControlLoop_SetLoaction() {
 
 #ifdef DUALCONTROL_MODE
 void MotorControlLoop_Dual() {
+    #ifdef INNER_DEBUG
     pidA_outer.target = TargetA;
     pidB_outer.target = TargetB;
 
@@ -442,28 +458,48 @@ void MotorControlLoop_Dual() {
    
     OutA=pidA_outer.output;
     OutB=pidB_outer.output;
+    #endif
    
-/*
-   pidA_inner.target = TargetA;
-   pidB_inner.target = TargetB;
+    #ifdef OUTER_DEBUG
 
-   PID_DualLoopControl(&pidA_inner);
-   PID_DualLoopControl(&pidB_inner);
+    pidA_inner.target = TargetA;
+    pidB_inner.target = TargetB;
+
+    PID_DualLoopControl(&pidA_inner);
+    PID_DualLoopControl(&pidB_inner);
    
 
-   ActualA=pidA_inner.actual;
-   ActualB=pidB_inner.actual;
+    ActualA=pidA_inner.actual;
+    ActualB=pidB_inner.actual;
 
     OutA=pidA_inner.output;
     OutB=pidB_inner.output;
 
-*/
+    #endif
+
 }
 #endif //DUALCONTROL_MODE
 
 
 #ifdef ANGLE_MODE
 void MotorControlLoop_Angle() {
+
+    #ifdef INNER_DEBUG
+    pidA_inner.target = TargetA;
+    pidB_inner.target = TargetB;
+
+    PID_Angle(&pidA_inner);
+    PID_Angle(&pidB_inner);
+
+
+    ActualA=pidA_inner.actual;
+    ActualB=pidB_inner.actual;
+
+    OutA=pidA_inner.output;
+    OutB=pidB_inner.output;
+    #endif
+
+    #ifdef OUTER_DEBUG
     // pidA_outer.target = TargetA;
     // pidB_outer.target = TargetB;
 
@@ -478,20 +514,9 @@ void MotorControlLoop_Angle() {
    
     // OutA=pidA_outer.output;
     // OutB=pidB_outer.output;
-   
+    #endif
 
-    pidA_inner.target = TargetA;
-    pidB_inner.target = TargetB;
-
-    PID_Angle(&pidA_inner);
-    PID_Angle(&pidB_inner);
-
-
-    ActualA=pidA_inner.actual;
-    ActualB=pidB_inner.actual;
-
-    OutA=pidA_inner.output;
-    OutB=pidB_inner.output;
+  
 
 
 }
@@ -501,10 +526,10 @@ void MotorControlLoop_Angle() {
 
 
 int main(void){
-    Delay_ms(100);
+    Delay_ms(10);
     Main_Config();
     //10ms看门
-    IWDG_Config(IWDG_Prescaler_16,25);
+    IWDG_Config(IWDG_Prescaler_32,25);
     while (1) {
         if (page1_flag) {
             if (page1_firstEntry) {
@@ -529,7 +554,6 @@ int main(void){
         {
             //0.00085
             MPU6050_Get_Angle_Plus(&MPU6050_Data);
-
             angle_temp=MPU6050_Data.pitch;
             #ifdef SETLOACTION_MODE
             MotorControlLoop_SetLoaction();
@@ -560,10 +584,10 @@ void TIM1_UP_IRQHandler(void)
         sys_cnt++;
         if(sys_cnt % 10 == 0)pid_timingFlag=1;
 
-        if(sys_cnt % 24 == 0)oled_BufDisplay_flag=1;
-        if(sys_cnt % 6 == 0)oled_BufDisplayOne_flag=1;
-        if(sys_cnt % 12 == 0)oled_BufDisplayTwo_flag=1;
-        if(sys_cnt % 18 == 0)oled_BufDisplayThree_flag=1;
+        if(sys_cnt % 48 == 0)oled_BufDisplay_flag=1;
+        if(sys_cnt % 12 == 0)oled_BufDisplayOne_flag=1;
+        if(sys_cnt % 24 == 0)oled_BufDisplayTwo_flag=1;
+        if(sys_cnt % 36 == 0)oled_BufDisplayThree_flag=1;
         //测试可行性,1s 闪烁led(pc13)
         if(sys_cnt % 1000 == 0)
         {
@@ -576,8 +600,6 @@ void TIM1_UP_IRQHandler(void)
             // } 
         
         }
-
-        
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);// 根据您的定时器和情况调整
     }
 }
