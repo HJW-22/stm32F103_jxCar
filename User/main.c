@@ -526,10 +526,10 @@ void MotorControlLoop_Angle() {
 
 
 int main(void){
-    Delay_ms(10);
+   Delay_ms(10);
     Main_Config();
-    //10ms看门
-    IWDG_Config(IWDG_Prescaler_32,25);
+    //20ms看门
+    //IWDG_Config(IWDG_Prescaler_32,200);
     while (1) {
         if (page1_flag) {
             if (page1_firstEntry) {
@@ -552,7 +552,28 @@ int main(void){
         }
         if (pid_timingFlag)
         {
-            //0.00085
+
+            pid_timingFlag=0;
+        }
+        //串口改变目标值
+        Serial_change();
+        IWDG_Feed();
+        
+    }
+}
+
+
+// 使用 static 关键字使 Count 保持其值
+void TIM1_UP_IRQHandler(void)
+{
+    static uint16_t sys_cnt=0;
+    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) 
+    {
+        if (sys_cnt==0);
+        sys_cnt++;
+        if(sys_cnt % 10 == 0){
+			//软件i2c 0.00085
+            //(?)硬件i2c(400k) 0.00124
             MPU6050_Get_Angle_Plus(&MPU6050_Data);
             angle_temp=MPU6050_Data.pitch;
             #ifdef SETLOACTION_MODE
@@ -564,26 +585,10 @@ int main(void){
             #endif // DUALCONTROL_MODE
 
             #ifdef ANGLE_MODE
-            MotorControlLoop_Angle();
+            //MotorControlLoop_Angle();
             #endif // ANGLE_MODE
-            pid_timingFlag=0;
+            pid_timingFlag=1;
         }
-        //串口改变目标值
-        Serial_change();
-        IWDG_Feed();
-    }
-}
-
-
-// 使用 static 关键字使 Count 保持其值
-void TIM1_UP_IRQHandler(void)
-{
-    static uint16_t sys_cnt=0;
-    if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) 
-    {
-        sys_cnt++;
-        if(sys_cnt % 10 == 0)pid_timingFlag=1;
-
         if(sys_cnt % 48 == 0)oled_BufDisplay_flag=1;
         if(sys_cnt % 12 == 0)oled_BufDisplayOne_flag=1;
         if(sys_cnt % 24 == 0)oled_BufDisplayTwo_flag=1;

@@ -11,7 +11,8 @@ I2C_BUS MPU6050_I2C;
 #define MPU6050Wirte_Reg(RegAddress,Data) I2C(MPU6050_I2C)->Write_Reg(RegAddress,Data)
 #define MPU6050Read_Reg(RegAddress)       I2C(MPU6050_I2C)->Read_Reg(RegAddress)
 
-
+#define MPU6050Wirte_Reg_continue(RegAddress,count,pData)       I2C(MPU6050_I2C)->Write_Reg_continue(RegAddress,count,pData)
+#define MPU6050Read_Reg_continue(RegAddress,count,pData)        I2C(MPU6050_I2C)->Read_Reg_continue(RegAddress,count,pData)
 
 //---------------------------- 寄存器地址 ----------------------------//
 #define MPU6050_ADDRESS		      0x68  //i2c address
@@ -170,7 +171,8 @@ SCl:选择你的GPIO(choose your GPIO)
 SDA:选择你的GPIO(choose your GPIO)
 注意:SCL和SDA来自同一组GPIO口(notice:SCL and SDA come from a same GPIO port)*/
 void MPU6050_Init(GPIO_TypeDef* GPIOx,uint16_t SCl,uint16_t SDA){
-    MPU6050_I2C = Create_SI2C(GPIOx,SCl,SDA,MPU6050_ADDRESS);//创建软件IIC
+
+    MPU6050_I2C = Create_HI2C(I2C2,MPU6050_ADDRESS);//创建软件IIC
 
     MPU6050_InitTypeDef MPU6050_init_Struct;
     MPU6050_init_Struct.SMPLRT_Rate = 100;            //采样率Hz
@@ -273,7 +275,9 @@ void MPU6050_Get_Angle(MPU6050* this){
 
 //四元素法+动态互补滤波
 float Acc_cc = 0;
+
 void MPU6050_Get_Angle_Plus(MPU6050* this) {
+		static uint8_t Data[14];
     // 四元素参数
     static float q_w = 1.0f;
     static float q_x = 0.0f;
@@ -297,14 +301,23 @@ void MPU6050_Get_Angle_Plus(MPU6050* this) {
     float qDot1, qDot2, qDot3, qDot4;
     static float _integralFBx = 0.0f, _integralFBy = 0.0f, _integralFBz = 0.0f;
 
-    // 从寄存器读取数据
-    int16_t AccX = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_XOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_ACCEL_XOUT_L);
-    int16_t AccY = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_YOUT_H)) << 8) |  (MPU6050_ACCEL_YOUT_L);
-    int16_t AccZ = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_ZOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_ACCEL_ZOUT_L);
-    int16_t GyroX = ((int16_t)(MPU6050Read_Reg(MPU6050_GYRO_XOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_GYRO_XOUT_L);
-    int16_t GyroY = ((int16_t)(MPU6050Read_Reg(MPU6050_GYRO_YOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_GYRO_YOUT_L);
-    int16_t GyroZ = (((int16_t)(MPU6050Read_Reg(MPU6050_GYRO_ZOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_GYRO_ZOUT_L)) - (int16_t)gyro_zero_z;
 
+	MPU6050Read_Reg_continue(MPU6050_ACCEL_XOUT_H, 14, Data);
+    // // 从寄存器读取数据
+    // int16_t AccX = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_XOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_ACCEL_XOUT_L);
+    // int16_t AccY = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_YOUT_H)) << 8) |  (MPU6050_ACCEL_YOUT_L);
+    // int16_t AccZ = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_ZOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_ACCEL_ZOUT_L);
+    // int16_t GyroX = ((int16_t)(MPU6050Read_Reg(MPU6050_GYRO_XOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_GYRO_XOUT_L);
+    // int16_t GyroY = ((int16_t)(MPU6050Read_Reg(MPU6050_GYRO_YOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_GYRO_YOUT_L);
+    // int16_t GyroZ = (((int16_t)(MPU6050Read_Reg(MPU6050_GYRO_ZOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_GYRO_ZOUT_L)) - (int16_t)gyro_zero_z;
+
+    int16_t AccX = (int16_t)(Data[0] << 8) | Data[1];
+    int16_t AccY = (int16_t)(Data[2] << 8) | Data[3];
+    int16_t AccZ = (int16_t)(Data[4] << 8) | Data[5];
+    // 解析陀螺仪数据 (每个轴16位数据)
+    int16_t GyroX = (int16_t)(Data[8] << 8) | Data[9];
+    int16_t GyroY = (int16_t)(Data[10] << 8) | Data[11];
+    int16_t GyroZ = (int16_t)(Data[12] << 8) | Data[13];
     // 数据转换
     float ax = (float)AccX / 16384.0f;
     float ay = (float)AccY / 16384.0f;

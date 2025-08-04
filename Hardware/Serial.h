@@ -20,6 +20,9 @@ extern char Serial_RxPacket1[];  // 用于 USART1 的接收缓冲区
 extern uint8_t Serial_RxFlag1;    // 用于 USART1 的接收标志 
 #define usart1_preemption 1
 #define usart1_sub        1
+static uint8_t TxBuffer_USART1[TX_BUFFER_SIZE]; 
+#define USART1_TX_DMA_CHANNEL   DMA1_Channel4 
+#define USART1_RX_DMA_CHANNEL   DMA1_Channel5
 #endif 
 
 #ifdef USART2_FLAG

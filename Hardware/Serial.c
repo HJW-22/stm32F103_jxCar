@@ -316,7 +316,57 @@ void USART1_IRQHandler(void)
 		
 		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
 	}
-} 
+}
+
+
+void USART1_DMA_Init(void) {  
+	// 使能DMA时钟  
+	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);  
+	
+	DMA_InitTypeDef DMA_InitStructure;  
+	
+	// TX DMA配置  
+	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART1->DR;  //外设基地址
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)TxBuffer_USART1;  //缓冲区基地址
+	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;  //指定外设是源还是目的地destination
+	DMA_InitStructure.DMA_BufferSize = TX_BUFFER_SIZE;  //缓冲区大小
+	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;  //设置源(外设)是否自动增加
+	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;  //设置目的地(缓冲区)是否自动增加
+	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;  //外设数据的类型
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;  //缓冲区数据的类型
+	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;  //模式循环还是正常
+	DMA_InitStructure.DMA_Priority = DMA_Priority_Medium;  //优先级
+	DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;   //内存到内存模式
+	
+	// 初始化DMA  
+	DMA_Init(USART1_TX_DMA_CHANNEL, &DMA_InitStructure);  
+	
+	// 使能USART1的DMA发送  
+	USART_DMACmd(USART1, USART_DMAReq_Tx, ENABLE);  
+}
+
+
+void USART1_DMA_Send(uint8_t* data, uint16_t size) {  
+	// 确保不超过缓冲区大小  
+	size = (size > TX_BUFFER_SIZE) ? TX_BUFFER_SIZE : size;  
+	
+	// 复制数据到缓冲区  
+	memcpy(TxBuffer_USART1, data, size);  
+	
+	// 关闭DMA  
+	DMA_Cmd(USART1_TX_DMA_CHANNEL, DISABLE);  
+	
+	// 设置传输数据量  
+	DMA_SetCurrDataCounter(USART1_TX_DMA_CHANNEL, size);  
+	
+	// 更新内存地址  
+	USART1_TX_DMA_CHANNEL->CMAR = (uint32_t)TxBuffer_USART1;  
+	
+	// 使能DMA  
+	DMA_Cmd(USART1_TX_DMA_CHANNEL, ENABLE);  
+}
+
+
 
 #endif // DEBUG
 

@@ -135,5 +135,6 @@ int16_t PID_DualLoopControl(PID_BicyclicParams *pid);
 
 void PID_Angle_Clear(PID_AngleParam *pid);
 
-#endif // !_PID_POSITIONAL__H
+		
+#endif 
 		

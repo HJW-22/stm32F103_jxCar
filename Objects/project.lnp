@@ -36,6 +36,7 @@
 ".\objects\encoder.o"
 ".\objects\pid_positional.o"
 ".\objects\serial.o"
+".\objects\iwdg.o"
 ".\objects\delay.o"
 ".\objects\timer.o"
 --strict --scatter ".\Objects\project.sct"

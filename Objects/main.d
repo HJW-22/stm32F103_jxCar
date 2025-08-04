@@ -41,3 +41,4 @@
 .\objects\main.o: .\Hardware\PID_Positional.h
 .\objects\main.o: .\Hardware\OLED_Font.h
 .\objects\main.o: .\System\Timer.h
+.\objects\main.o: .\Hardware\IWDG.h

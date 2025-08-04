@@ -19,8 +19,8 @@ typedef struct I2C_BUS
 	uint8_t (*AckTest)();																			 //响应接口(1 success,0 failed),it can check that if our I2C bus is init succese
 	uint8_t Mode16bit;																				 //将IIC升级为16位操作(置1为升级),boost reg operation to 16bit
 	void (*Rest_Speed)(uint32_t Speed);																 //硬件I2C重新设置速度,you can reset your Hardware I2C Speed	
-	uint8_t (*Write_Reg_continue)(uint8_t Device_Add,uint8_t RegAddress,uint8_t Count,uint8_t* Data);//连续写寄存器函数,continue write register by I2C bus，为了适应移植
-	uint8_t (*Read_Reg_continue)(uint8_t Device_Add,uint8_t RegAddress,uint8_t Count,uint8_t* Data); //连续读寄存器函数,continue read register by I2C bus，为了适应移植
+	void (*Write_Reg_continue)(uint8_t RegAddress,uint16_t Count,uint8_t* Data);//连续写寄存器函数,continue write register by I2C bus，为了适应移植
+	void (*Read_Reg_continue)(uint8_t RegAddress,uint16_t Count,uint8_t* Data); //连续读寄存器函数,continue read register by I2C bus，为了适应移植
 
 }I2C_BUS;
 

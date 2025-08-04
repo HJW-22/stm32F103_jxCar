@@ -6,6 +6,13 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "_I2C.h"
+
+I2C_BUS OLED_I2C;
+
+#define OLED_WriteCommand(RegAddress,Data)           I2C(OLED_I2C)->Write_Reg(RegAddress,Data)
+#define OLED_WriteData(RegAddress,count,pData)       I2C(OLED_I2C)->Write_Reg_continue(RegAddress,count,pData)
+
 
 #define OLED_ADDRESS 0x78 // OLED I2C地址
 
@@ -23,99 +30,104 @@ uint8_t OLED_Delay = OLED_CHRONOLOGY_DELAY_TIME;
 
 uint8_t OLED_DisplayBuf[8][128];
 
-//------------------------软件I2C基本时序部分------------------------
-void OLED_I2C_W_SCL(uint8_t BitValue)
-{
-    GPIO_WriteBit(OLED_GPIO_GROUP, OLED_I2C_SCL, (BitAction)BitValue);
-#ifdef OLED_CHRONOLOGY_DELAY_FLAG
-    Delay_us(OLED_Delay);
-#endif // OLED_CHRONOLOGY_DELAY_FLAG
-}
+// //------------------------软件I2C基本时序部分------------------------
+// void OLED_I2C_W_SCL(uint8_t BitValue)
+// {
+//     GPIO_WriteBit(OLED_GPIO_GROUP, OLED_I2C_SCL, (BitAction)BitValue);
+// #ifdef OLED_CHRONOLOGY_DELAY_FLAG
+//     Delay_us(OLED_Delay);
+// #endif // OLED_CHRONOLOGY_DELAY_FLAG
+// }
 
-void OLED_I2C_W_SDA(uint8_t BitValue)
-{
-    GPIO_WriteBit(OLED_GPIO_GROUP, OLED_I2C_SDA, (BitAction)BitValue);
-#ifdef OLED_CHRONOLOGY_DELAY_FLAG
-    Delay_us(OLED_Delay);
-#endif // OLED_CHRONOLOGY_DELAY_FLAG
-}
+// void OLED_I2C_W_SDA(uint8_t BitValue)
+// {
+//     GPIO_WriteBit(OLED_GPIO_GROUP, OLED_I2C_SDA, (BitAction)BitValue);
+// #ifdef OLED_CHRONOLOGY_DELAY_FLAG
+//     Delay_us(OLED_Delay);
+// #endif // OLED_CHRONOLOGY_DELAY_FLAG
+// }
 
-uint8_t OLED_I2C_R_SDA(void)
-{
-    uint8_t BitValue;
-    BitValue = GPIO_ReadInputDataBit(OLED_GPIO_GROUP, OLED_I2C_SDA);
-    return BitValue;
-}
+// uint8_t OLED_I2C_R_SDA(void)
+// {
+//     uint8_t BitValue;
+//     BitValue = GPIO_ReadInputDataBit(OLED_GPIO_GROUP, OLED_I2C_SDA);
+//     return BitValue;
+// }
 
-uint8_t OLED_I2C_R_SCL(void)
-{
-    uint8_t BitValue;
-    BitValue = GPIO_ReadInputDataBit(OLED_GPIO_GROUP, OLED_I2C_SCL);
-    return BitValue;
-}
+// uint8_t OLED_I2C_R_SCL(void)
+// {
+//     uint8_t BitValue;
+//     BitValue = GPIO_ReadInputDataBit(OLED_GPIO_GROUP, OLED_I2C_SCL);
+//     return BitValue;
+// }
 
+// void OLED_GPIO_Init(void)
+// {
+//     GPIO_InitTypeDef GPIO_InitStructure;
+
+//     RCC_APB2PeriphClockCmd(OLED_GPIO_CLK, ENABLE);
+
+//     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_OD; // 开漏输出
+//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+//     GPIO_InitStructure.GPIO_Pin   = OLED_I2C_SCL | OLED_I2C_SDA;
+//     GPIO_Init(OLED_GPIO_GROUP, &GPIO_InitStructure);
+
+//     GPIO_SetBits(GPIOB, OLED_I2C_SCL | OLED_I2C_SDA);
+// }
 void OLED_GPIO_Init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStructure;
-
-    RCC_APB2PeriphClockCmd(OLED_GPIO_CLK, ENABLE);
-
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_OD; // 开漏输出
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_Pin   = OLED_I2C_SCL | OLED_I2C_SDA;
-    GPIO_Init(OLED_GPIO_GROUP, &GPIO_InitStructure);
-
-    GPIO_SetBits(GPIOB, OLED_I2C_SCL | OLED_I2C_SDA);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO,ENABLE);  //开启AFIO时钟
+    GPIO_PinRemapConfig(GPIO_Remap_I2C1,ENABLE);  
+    OLED_I2C = Create_HI2C(I2C1,OLED_ADDRESS);//创建软件IIC
 }
+// void OLED_I2C_Start(void)
+// {
+//     OLED_I2C_W_SDA(1);
+//     OLED_I2C_W_SCL(1);
+//     OLED_I2C_W_SDA(0);
+//     OLED_I2C_W_SCL(0);
+// }
 
-void OLED_I2C_Start(void)
-{
-    OLED_I2C_W_SDA(1);
-    OLED_I2C_W_SCL(1);
-    OLED_I2C_W_SDA(0);
-    OLED_I2C_W_SCL(0);
-}
+// void OLED_I2C_Stop(void)
+// {
+//     OLED_I2C_W_SDA(0);
+//     OLED_I2C_W_SCL(1);
+//     OLED_I2C_W_SDA(1);
+// }
 
-void OLED_I2C_Stop(void)
-{
-    OLED_I2C_W_SDA(0);
-    OLED_I2C_W_SCL(1);
-    OLED_I2C_W_SDA(1);
-}
+// void OLED_I2C_SendByte(uint8_t Byte)
+// {
+//     uint8_t i;
 
-void OLED_I2C_SendByte(uint8_t Byte)
-{
-    uint8_t i;
+//     for (i = 0; i < 8; i++) {
+//         OLED_I2C_W_SDA(!!(Byte & (0x80 >> i)));
+//         OLED_I2C_W_SCL(1);
+//         OLED_I2C_W_SCL(0);
+//     }
+//     OLED_I2C_W_SCL(1);
+//     OLED_I2C_W_SCL(0);
+// }
 
-    for (i = 0; i < 8; i++) {
-        OLED_I2C_W_SDA(!!(Byte & (0x80 >> i)));
-        OLED_I2C_W_SCL(1);
-        OLED_I2C_W_SCL(0);
-    }
-    OLED_I2C_W_SCL(1);
-    OLED_I2C_W_SCL(0);
-}
+// void OLED_WriteCommand(uint8_t address, uint8_t Command)
+// {
+//     OLED_I2C_Start();
+//     OLED_I2C_SendByte(address);
+//     OLED_I2C_SendByte(0x00);
+//     OLED_I2C_SendByte(Command);
+//     OLED_I2C_Stop();
+// }
 
-void OLED_WriteCommand(uint8_t address, uint8_t Command)
-{
-    OLED_I2C_Start();
-    OLED_I2C_SendByte(address);
-    OLED_I2C_SendByte(0x00);
-    OLED_I2C_SendByte(Command);
-    OLED_I2C_Stop();
-}
-
-void OLED_WriteData(uint8_t address, uint8_t *Data, uint8_t Count)
-{
-    uint8_t i;
-    OLED_I2C_Start();
-    OLED_I2C_SendByte(address);
-    OLED_I2C_SendByte(0x40);
-    for (i = 0; i < Count; i++) {
-        OLED_I2C_SendByte(Data[i]);
-    }
-    OLED_I2C_Stop();
-}
+// void OLED_WriteData(uint8_t address, uint8_t *Data, uint8_t Count)
+// {
+//     uint8_t i;
+//     OLED_I2C_Start();
+//     OLED_I2C_SendByte(address);
+//     OLED_I2C_SendByte(0x40);
+//     for (i = 0; i < Count; i++) {
+//         OLED_I2C_SendByte(Data[i]);
+//     }
+//     OLED_I2C_Stop();
+// }
 
 //------------------------软件I2C通讯部分------------------------
 
@@ -288,7 +300,7 @@ void OLED_Update(void)
         /*设置光标位置为每一页的第一列*/
         OLED_SetCursor(j, 0);
         /*连续写入128个数据，将显存数组的数据写入到OLED硬件*/
-        OLED_WriteData(OLED_ADDRESS, OLED_DisplayBuf[j], 128);
+        OLED_WriteData(OLED_ADDRESS, 128, OLED_DisplayBuf[j]);
     }
 }
 
@@ -319,7 +331,7 @@ void OLED_UpdateArea(int16_t X, int16_t Y, int16_t Width, int16_t Height)
             /*设置光标位置为相关页的指定列*/
             OLED_SetCursor(j, X);
             /*连续写入Width个数据，将显存数组的数据写入到OLED硬件*/
-            OLED_WriteData(OLED_ADDRESS, &OLED_DisplayBuf[j][X], Width);
+            OLED_WriteData(OLED_ADDRESS, Width, &OLED_DisplayBuf[j][X]);
         }
     }
 }
@@ -355,7 +367,7 @@ void OLED_ShowChar(int16_t X, int16_t Y, char Char, int16_t FontSize)
  *                                        OLED_6X8		  宽6像素，高8像素
  * @retval 无
  */
-void OLED_ShowString(int16_t X, int16_t Y, char *String, uint8_t FontSize)
+void    OLED_ShowString(int16_t X, int16_t Y, char *String, uint8_t FontSize)
 {
 
     uint16_t i = 0;

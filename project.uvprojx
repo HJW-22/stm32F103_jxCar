@@ -314,7 +314,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>0</Optim>
+            <Optim>2</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -768,6 +768,16 @@
               <FileName>Serial.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Hardware\Serial.h</FilePath>
+            </File>
+            <File>
+              <FileName>IWDG.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\IWDG.c</FilePath>
+            </File>
+            <File>
+              <FileName>IWDG.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\IWDG.h</FilePath>
             </File>
           </Files>
         </Group>
