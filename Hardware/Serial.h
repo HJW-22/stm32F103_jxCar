@@ -33,7 +33,7 @@ extern uint8_t Serial_RxFlag2;    // 用于 USART2 的接收标志
 // USART3 TX DMA配置  
 static uint8_t TxBuffer_USART2[TX_BUFFER_SIZE]; 
 #define USART2_TX_DMA_CHANNEL   DMA1_Channel7  
-#define USART2_RX_DMA_CHANNEL   DMA1_Channel6  
+//#define USART2_RX_DMA_CHANNEL   DMA1_Channel6  
 #endif 
  
 

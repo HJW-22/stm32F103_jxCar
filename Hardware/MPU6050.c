@@ -8,11 +8,29 @@
 
 I2C_BUS MPU6050_I2C;
 
-#define MPU6050Wirte_Reg(RegAddress,Data) I2C(MPU6050_I2C)->Write_Reg(RegAddress,Data)
-#define MPU6050Read_Reg(RegAddress)       I2C(MPU6050_I2C)->Read_Reg(RegAddress)
+// 包装函数实现
+void MPU6050_Write_Wrapper(uint8_t RegAddress, uint16_t Data) {
+    MPU6050_I2C.Write_Reg(&MPU6050_I2C, RegAddress, Data);
+}
 
-#define MPU6050Wirte_Reg_continue(RegAddress,count,pData)       I2C(MPU6050_I2C)->Write_Reg_continue(RegAddress,count,pData)
-#define MPU6050Read_Reg_continue(RegAddress,count,pData)        I2C(MPU6050_I2C)->Read_Reg_continue(RegAddress,count,pData)
+uint16_t MPU6050_Read_Wrapper(uint8_t RegAddress) {
+    return MPU6050_I2C.Read_Reg(&MPU6050_I2C, RegAddress);
+}
+
+void MPU6050_Write_Continue_Wrapper(uint8_t RegAddress, uint16_t Count, uint8_t* Data) {
+    MPU6050_I2C.Write_Reg_continue(&MPU6050_I2C, RegAddress, Count, Data);
+}
+
+void MPU6050_Read_Continue_Wrapper(uint8_t RegAddress, uint16_t Count, uint8_t* Data) {
+    MPU6050_I2C.Read_Reg_continue(&MPU6050_I2C, RegAddress, Count, Data);
+}
+
+
+#define MPU6050Wirte_Reg(RegAddress,Data) MPU6050_Write_Wrapper(RegAddress,Data)
+#define MPU6050Read_Reg(RegAddress)       MPU6050_Read_Wrapper(RegAddress)
+
+#define MPU6050Wirte_Reg_continue(RegAddress,count,pData)      MPU6050_Write_Continue_Wrapper(RegAddress,count,pData)
+#define MPU6050Read_Reg_continue(RegAddress,count,pData)       MPU6050_Read_Continue_Wrapper(RegAddress,count,pData)
 
 //---------------------------- 寄存器地址 ----------------------------//
 #define MPU6050_ADDRESS		      0x68  //i2c address
@@ -302,7 +320,7 @@ void MPU6050_Get_Angle_Plus(MPU6050* this) {
     static float _integralFBx = 0.0f, _integralFBy = 0.0f, _integralFBz = 0.0f;
 
 
-	MPU6050Read_Reg_continue(MPU6050_ACCEL_XOUT_H, 14, Data);
+	  MPU6050Read_Reg_continue(MPU6050_ACCEL_XOUT_H, 14, Data);
     // // 从寄存器读取数据
     // int16_t AccX = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_XOUT_H)) << 8) | MPU6050Read_Reg(MPU6050_ACCEL_XOUT_L);
     // int16_t AccY = ((int16_t)(MPU6050Read_Reg(MPU6050_ACCEL_YOUT_H)) << 8) |  (MPU6050_ACCEL_YOUT_L);

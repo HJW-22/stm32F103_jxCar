@@ -33,4 +33,15 @@ void OLED_ShowFloatNum(int16_t X, int16_t Y, float Number, uint8_t IntLength, ui
 void OLED_ShowImage(int16_t X, int16_t Y, int16_t Width, int16_t Height,const uint8_t *Image);
 void OLED_ShowUnsignedFloatNum(int16_t X, int16_t Y, float Number, uint8_t IntLength, uint8_t FraLength, uint8_t FontSize);
 
+
+// DMA传输状态标记
+extern volatile uint8_t OLED_DMA_TransferComplete;
+
+// 函数声明
+void OLED_DMA_Init(void);
+void OLED_Update_DMA(void);
+void DMA1_Channel6_IRQHandler(void);  // I2C1 TX DMA通道
+
+// void OLED_UpdateArea_DMA(int16_t X, int16_t Y, int16_t Width, int16_t Height);
+
 #endif

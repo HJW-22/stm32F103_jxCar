@@ -35,3 +35,4 @@
 .\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 .\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\objects\oled.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
+.\objects\oled.o: Hardware\_I2C.h
