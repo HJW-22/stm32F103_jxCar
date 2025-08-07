@@ -255,6 +255,18 @@
           },
           {
             "path": "Hardware/IWDG.c"
+          },
+          {
+            "path": "Hardware/esp8266.c"
+          },
+          {
+            "path": "Hardware/esp8266.h"
+          },
+          {
+            "path": "Hardware/esp8266_uart.c"
+          },
+          {
+            "path": "Hardware/esp8266_uart.h"
           }
         ],
         "folders": []

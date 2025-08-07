@@ -779,6 +779,26 @@
               <FileType>5</FileType>
               <FilePath>.\Hardware\IWDG.h</FilePath>
             </File>
+            <File>
+              <FileName>esp8622.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\esp8622.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp8622.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\esp8622.h</FilePath>
+            </File>
+            <File>
+              <FileName>esp8622_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\esp8622_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp8622_uart.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\esp8622_uart.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

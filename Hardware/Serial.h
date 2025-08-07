@@ -11,7 +11,7 @@
 #define TX_BUFFER_SIZE 64  // 根据需要调整大小  
 //用不到注释即可
 #define USART1_FLAG
-#define USART2_FLAG
+// #define USART2_FLAG
 //#define USART3_FLAG
 
 

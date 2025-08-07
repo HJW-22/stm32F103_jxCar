@@ -166,7 +166,16 @@ void Serial_Init(void)
     NVIC_Init(&NVIC_InitStructure);
 	#endif // DEBUG
 }
-
+void Serial_Printf(USART_TypeDef *USARTx,  char *format, ...)  
+{  
+    char String[100];
+	va_list arg;
+	va_start(arg, format);
+	vsprintf(String, format, arg);
+	va_end(arg);
+    // 发送格式化后的字符串  
+    Serial_SendString(String, USARTx);  
+}  
 
 // 发送字节，增加串口选择参数  
 void Serial_SendByte(uint8_t Byte, USART_TypeDef *USARTx)  
@@ -214,18 +223,7 @@ void _sys_exit(int x)
 	x = x; 
 } 
 
-//重定向打印
-void Serial_Printf(USART_TypeDef *USARTx,  char *format, ...)  
-{  
-    char String[100];
-	va_list arg;
-	va_start(arg, format);
-	vsprintf(String, format, arg);
-	va_end(arg);
-    // 发送格式化后的字符串  
-    Serial_SendString(String, USARTx);  
-}  
-
+ 
 //x*y 数学函数
 uint32_t Serial_Pow(uint32_t X, uint32_t Y)
 {
@@ -414,6 +412,9 @@ void USART2_IRQHandler(void)
 		USART_ClearITPendingBit(USART2, USART_IT_RXNE);
 	}
 } 
+
+
+
 
 void USART2_DMA_Init(void) {  
 	// 使能DMA时钟  

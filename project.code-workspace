@@ -10,7 +10,8 @@
             "oled_font.h": "c",
             "string.h": "c",
             "delay.h": "c",
-            "_i2c.h": "c"
+            "_i2c.h": "c",
+            "esp8266.h": "c"
         }
     },
     "extensions": {}

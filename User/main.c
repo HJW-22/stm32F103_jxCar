@@ -11,7 +11,7 @@
 #include "OLED_Font.h"
 #include "Timer.h"
 #include "IWDG.h"
-
+#include "esp8266.h"
 
 MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 
@@ -22,6 +22,7 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 // #define MOTORB_DEBUG
 
 //双环pid选项内环还是外环调试(用于调参串口2)
+
 #define INNER_DEBUG        //内部
 // #define OUTER_DEBUG     //外部
 
@@ -35,6 +36,33 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 // #define SETLOACTION_MODE
 // #define DUALCONTROL_MODE
 #define ANGLE_MODE
+
+// void sendATCommand(char* cmd, uint16_t timeout) {
+//   // 发送命令
+//   Serial_Printf(USART2, "%s\r\n", cmd);  // 确保AT命令以\r\n结尾
+  
+//   while (!Serial_RxFlag2) {
+//     if ((timeout--)==0) {
+//       Serial_Printf(USART1, "CMD %s timeout!\r\n", cmd);
+//       return;
+//     }
+//   }
+//     // 打印接收到的响应
+//     Serial_Printf(USART1, "[DEBUG] CMD: %s\r\nResponse: %s\r\n", cmd, Serial_RxPacket2);
+    
+//     // 解析响应判断是否成功
+//     if (strstr(Serial_RxPacket2, "OK") || strstr(Serial_RxPacket2, "CONNECT")) {
+//         Serial_Printf(USART1, "[INFO] Command success\r\n");
+//     } else {
+//         Serial_Printf(USART1, "[WARN] Command may have failed\r\n");
+//     }
+// }
+// void WIFI_Init() {
+//   sendATCommand("AT", 10000);      // 设置为STA模式
+//   sendATCommand("AT+CWMODE=1", 10000);      // 设置为STA模式
+//   sendATCommand("AT+CWJAP=\"Xiaomi_D351\",\"Hjwa3b9c\"", 50000);  // 连接WiFi
+//   sendATCommand("AT+CIPSTART=\"TCP\",\"192.168.32.32\",8080", 20000);  // 连接服务器
+// }
 
 
 
@@ -151,8 +179,9 @@ float angle_temp=0;
 
 int16_t Angle_Get()
 {
-    return ((-angle_temp)+3.3);
+    return ((-angle_temp)+3.4);
 }
+//往前倒+,往后- oled方向
 
 
 
@@ -181,12 +210,21 @@ void Main_Config()
     // OLED_Update();
     OLED_Update_DMA();
     Delay_ms(800);
-
     Serial_Init(); 
+    // WIFI_Init();
+
+    if (ESP8266_Init(115200)==ATK_MW8266D_EOK)
+    {
+       Serial_Printf(USART1, "发送成功\n");
+    }else
+    {
+       Serial_Printf(USART1, "发送失败\n");
+    }
+
     Motor_Init();
     Encoder_TIM4_Init();
     Encoder_TIM3_Init();
-    USART2_DMA_Init();
+    // USART2_DMA_Init();
     //LED_Init();
 
     MPU6050_Init(GPIOB,GPIO_Pin_10,GPIO_Pin_11);
@@ -222,16 +260,19 @@ void Main_Config()
 
 
     #ifdef INNER_DEBUG
-    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3,0,0,-80,80,MotorA_SetSpeed);
-    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3,0,0,-80,80,MotorB_SetSpeed);
+    PID_Init_Angle(MOTOR_A,1,&pidA_inner,Encoder_TIM3_Get,20,0,0,-100,100,MotorA_SetSpeed);
+    PID_Init_Angle(MOTOR_B,1,&pidB_inner,Encoder_TIM4_Get,20,0,0,-100,100,MotorB_SetSpeed);
     #endif // INNER_DEBUG
    
     //一般来说如果单环的参数不可以使用到双环内
     #ifdef OUTER_DEBUG
-    PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,3,0,0,-80,80,MotorA_SetSpeed);
-    PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,3,0,0,-80,80,MotorB_SetSpeed);
-    PID_Init_Angle(MOTOR_A,&pidA_outer,NULL,0.004,0,0.8,-100,100,NULL);
-    PID_Init_Angle(MOTOR_B,&pidB_outer,NULL,0.004,0,0.8,-100,100,NULL);
+    // PID_Init_Angle(MOTOR_A,&pidA_inner,Angle_Get,200,0,2500,-7200,7200,MotorA_SetSpeed);
+    // PID_Init_Angle(MOTOR_B,&pidB_inner,Angle_Get,200,0,2500,-7200,7200,MotorB_SetSpeed);
+
+    PID_Init_Angle(MOTOR_A,1,&pidA_inner,Encoder_TIM3_Get,0,0,0,-100,100,MotorA_SetSpeed);
+    PID_Init_Angle(MOTOR_B,1,&pidB_inner,Encoder_TIM4_Get,0,0,0,-100,100,MotorB_SetSpeed);
+    PID_Init_Angle(MOTOR_A,0,&pidA_outer,Angle_Get,0,0,0,-100,100,NULL);
+    PID_Init_Angle(MOTOR_B,0,&pidB_outer,Angle_Get,0,0,0,-100,100,NULL);
     #endif // OUTER_DEBUG
    
     #endif
@@ -330,7 +371,7 @@ void OLED_MPU6050CycleDisplay()
 void OLED_SerialSend()
 {
     #ifdef USART1_FLAG
-    Serial_Printf(USART1, "串口1初始化成功！\n");
+    Serial_Printf(USART1, "串口1初始化成功！\r\n");
     #endif // USART1_FLAG
 
     #ifdef USART2_FLAG
@@ -362,12 +403,12 @@ void OLED_PIDCycleSend()
     }  
     
     // 发送格式化数据  
-    USART2_DMA_Send((uint8_t *)buffer, len);  
+    // USART2_DMA_Send((uint8_t *)buffer, len);  
 }
 //0.0016
 void OLED_MPU6050CycleSend()
 {
-    Serial_Printf(USART2,"%.3f,%.3f,%.3f\n",MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
+    //Serial_Printf(USART2,"%.3f,%.3f,%.3f\n",MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
 }
 
 void Serial_change()
@@ -494,8 +535,8 @@ void MotorControlLoop_Angle() {
     pidA_inner.target = TargetA;
     pidB_inner.target = TargetB;
 
-    PID_Angle(&pidA_inner);
-    PID_Angle(&pidB_inner);
+    PID_Cascade(&pidA_inner);
+    PID_Cascade(&pidB_inner);
 
 
     ActualA=pidA_inner.actual;
@@ -506,23 +547,21 @@ void MotorControlLoop_Angle() {
     #endif
 
     #ifdef OUTER_DEBUG
-    // pidA_outer.target = TargetA;
-    // pidB_outer.target = TargetB;
+    pidA_outer.target = 0;
+    pidB_outer.target = 0;
 
-    // pidA_inner.target =PID_Angle(&pidA_outer);
-    // pidB_inner.target =PID_Angle(&pidB_outer);
+    pidA_inner.target =PID_Cascade(&pidA_outer)+TargetA;
+    pidB_inner.target =PID_Cascade(&pidB_outer)+TargetB;
 
-    // PID_Angle(&pidA_inner);
-    // PID_Angle(&pidB_inner);
+    PID_Cascade(&pidA_inner);
+    PID_Cascade(&pidB_inner);
 
-    // ActualA=pidA_outer.actual;
-    // ActualB=pidB_outer.actual;
+    ActualA=pidA_outer.actual;
+    ActualB=pidB_outer.actual;
    
-    // OutA=pidA_outer.output;
-    // OutB=pidB_outer.output;
+    OutA=pidA_outer.output;
+    OutB=pidB_outer.output;
     #endif
-
-  
 
 
 }
@@ -535,7 +574,7 @@ int main(void){
    Delay_ms(10);
     Main_Config();
     //20ms看门
-    IWDG_Config(IWDG_Prescaler_16,25);
+    // IWDG_Config(IWDG_Prescaler_16,100);
     while (1) {
         if (page1_flag) {
             if (page1_firstEntry) {
@@ -561,6 +600,9 @@ int main(void){
             
             pid_timingFlag=0;
         }
+		// Serial_SendByte('s',USART2);
+		// Serial_Printf(USART2,"AT\r\n");
+        // Serial_SendByte(0x55,USART2);
         //串口改变目标值
         Serial_change();
         IWDG_Feed();
@@ -578,6 +620,7 @@ void TIM1_UP_IRQHandler(void)
         if (sys_cnt==0);
         sys_cnt++;
         if(sys_cnt % 10 == 0){
+
 			//软件i2c 0.00085
             //硬件i2c(400k) 0.00124
             MPU6050_Get_Angle_Plus(&MPU6050_Data);

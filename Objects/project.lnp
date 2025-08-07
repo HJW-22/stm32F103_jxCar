@@ -37,6 +37,8 @@
 ".\objects\pid_positional.o"
 ".\objects\serial.o"
 ".\objects\iwdg.o"
+".\objects\esp8622.o"
+".\objects\esp8622_uart.o"
 ".\objects\delay.o"
 ".\objects\timer.o"
 --strict --scatter ".\Objects\project.sct"

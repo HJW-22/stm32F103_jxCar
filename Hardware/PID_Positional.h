@@ -80,6 +80,7 @@ typedef struct {
         float error[2];       // 当前和上一次误差 [0]当前 [1]上一次
         float integral;       // 积分项
         float speed;
+        
     } state;
     void (*SetPWM)(int16_t output);// PWM 输出函数指针  
     int16_t (*GetPWM)(void);
@@ -90,6 +91,7 @@ typedef struct {
 // PID双环控制(内环角度外环位置)配置结构体（推荐）
 typedef struct {
     uint8_t name;
+    uint16_t is_inner_loop;
     //内环参数
     float kp;
     float ki;
@@ -101,11 +103,14 @@ typedef struct {
 
     float outMin;
     float outMax;
+
+    
     // 内部状态（无需外部操作）
     struct {
         float error[2];       // 当前和上一次误差 [0]当前 [1]上一次
         float integral;       // 积分项
         float speed;
+        float derivative;
     } state;
     void (*SetPWM)(int16_t output);// PWM 输出函数指针  
     int16_t (*GetPWM)(void);
@@ -119,8 +124,8 @@ typedef struct {
 
 void PID_Init(PID_Params *pid ,float kp,float ki,float kd,PIDVersion_I i_mode,PIDVersion_D d_mode ,float alpha);
 void PID_SetLocation_Optimization(PID_Params *pid);
-void PID_Init_Angle( uint8_t name,PID_AngleParam *pid, int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output));
-int16_t PID_Angle(PID_AngleParam *pid);
+void PID_Init_Angle( uint8_t name,uint16_t is_inner_loop, PID_AngleParam *pid, int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output));
+int16_t PID_Cascade(PID_AngleParam *pid);
 
 
 void PID_Init_BicyclicParams(
@@ -137,4 +142,5 @@ void PID_Angle_Clear(PID_AngleParam *pid);
 
 		
 #endif 
+
 		

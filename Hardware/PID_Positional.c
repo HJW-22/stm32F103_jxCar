@@ -200,52 +200,50 @@ int16_t PID_DualLoopControl(PID_BicyclicParams *pid)
 }
 
 
-// 双环控制函数(没有如何优化,只有限幅)
-int16_t PID_Angle(PID_AngleParam *pid) 
-{
-    
-    // 获取实际值
-    if(pid->GetPWM != NULL) {
-        pid->actual = pid->GetPWM();
-        if(pid->name == MOTOR_A){
-        motorA_speed +=pid->actual;
-        }else
-        {
-            motorB_speed +=pid->actual; 
-        }
+// 双环PID控制函数（角度环+速度环）
+int16_t PID_Cascade(PID_AngleParam *pid) {
+    // 1. 获取实际值（区分内外环）
+    float actual_value;
+    if (pid->is_inner_loop) {
+        // 内环（速度环）：从编码器获取实际速度
+        actual_value = pid->GetPWM();  // 编码器反馈的速度值（RPM或脉冲/秒）
     } else {
-        // 外环使用全局位置变量
-        pid->actual = (pid->name == MOTOR_A) ? motorA_speed : motorB_speed;
+        // 外环（角度环）：从IMU获取实际角度
+        actual_value = pid->GetPWM();  // IMU反馈的角度值（度或弧度）
     }
+    pid->actual = actual_value;
 
-    // PID计算
+    // 2. 计算误差
     pid->state.error[1] = pid->state.error[0];
     pid->state.error[0] = pid->target - pid->actual;
-    
-    // 积分项处理
+
+    // 3. 积分项处理（抗饱和）
     if (pid->ki != 0) {
         pid->state.integral += pid->state.error[0];
+        // 积分限幅（限制在输出范围的20%）
+        float max_integral = 0.2 * (pid->outMax - pid->outMin) / pid->ki;
+        pid->state.integral = constrain(pid->state.integral, -max_integral, max_integral);
     }
-    
-    // PID计算
+
+    // 4. 微分项滤波（一阶低通）
+    float raw_derivative = pid->state.error[0] - pid->state.error[1];
+    pid->state.derivative = 0.3 * raw_derivative + 0.7 * pid->state.derivative;
+
+    // 5. PID计算
     pid->output = pid->kp * pid->state.error[0] 
                 + pid->ki * pid->state.integral 
-                + pid->kd * (pid->state.error[0] - pid->state.error[1]);
-    
+                + pid->kd * pid->state.derivative;
 
-    
-    // 输出限幅
-    pid->output = constrain(pid->output, pid->outMin, pid->outMax);
-
-    // // 7. 死区（可选）
-    // if(pid->GetPWM != NULL) {
-    //     if (fabs(pid->state.error[0]) < 50) {
-    //         pid->output = 0;
-    //     }
+    // // 6. 死区处理（避免电机抖动）
+    // if (fabs(pid->state.error[0]) < pid->dead_zone) {
+    //     pid->output = 0;
     // }
 
-    // 应用输出
-    if(pid->SetPWM != NULL) {
+    // 7. 输出限幅
+    pid->output = constrain(pid->output, pid->outMin, pid->outMax);
+
+    // 8. 应用输出（仅内环直接控制电机）
+    if (pid->is_inner_loop && pid->SetPWM != NULL) {
         pid->SetPWM(pid->output);
     }
     
@@ -257,9 +255,9 @@ int16_t PID_Angle(PID_AngleParam *pid)
 
 
 
-void PID_Init_Angle( uint8_t name, PID_AngleParam *pid, int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
+void PID_Init_Angle( uint8_t name,uint16_t is_inner_loop, PID_AngleParam *pid, int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
 {  
-
+    pid->is_inner_loop=is_inner_loop;
     pid->name=name;
     // 设置函数指针  
     pid->GetPWM = GetPWM; // 初始化获取 PWM 的函数  
