@@ -34,7 +34,7 @@ void PID_Init(PID_Params *pid ,float kp,float ki,float kd,PIDVersion_I i_mode,PI
 }
 
 
-void PID_Init_BicyclicParams( uint8_t name,PID_BicyclicParams *pid,  int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
+void PID_Init_BicyclicParams( uint8_t name,PID_BicyclicParams *pid,  float (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
 {  
 
     pid->name=name;
@@ -201,28 +201,39 @@ int16_t PID_DualLoopControl(PID_BicyclicParams *pid)
 
 
 // 双环PID控制函数（角度环+速度环）
-int16_t PID_Cascade(PID_AngleParam *pid) {
+float PID_Cascade(PID_AngleParam *pid) {
     // 1. 获取实际值（区分内外环）
     float actual_value;
+    float actual_test;
     if (pid->is_inner_loop) {
-        // 内环（速度环）：从编码器获取实际速度
-        actual_value = pid->GetPWM();  // 编码器反馈的速度值（RPM或脉冲/秒）
+        // 内环（速度环）：从编码器获取实际速度 
+        actual_test = pid->GetCounter();  // 编码器反馈的速度值（RPM或脉冲/秒）
+        pid->actual += actual_test;
     } else {
         // 外环（角度环）：从IMU获取实际角度
-        actual_value = pid->GetPWM();  // IMU反馈的角度值（度或弧度）
+        actual_value = pid->GetAngle();  // IMU反馈的角度值（度或弧度）
+        pid->actual = actual_value;
     }
-    pid->actual = actual_value;
+    
 
     // 2. 计算误差
     pid->state.error[1] = pid->state.error[0];
     pid->state.error[0] = pid->target - pid->actual;
 
+
     // 3. 积分项处理（抗饱和）
     if (pid->ki != 0) {
+                // 在PID计算前，检查误差是否值得积分
+    if (fabsf(pid->state.error[0]) > 0.1f) {  // 死区阈值
         pid->state.integral += pid->state.error[0];
+    }
         // 积分限幅（限制在输出范围的20%）
-        float max_integral = 0.2 * (pid->outMax - pid->outMin) / pid->ki;
-        pid->state.integral = constrain(pid->state.integral, -max_integral, max_integral);
+      // 改为动态比例限制（如输出范围的50%）
+    float max_integral = 0.5f * (pid->outMax - pid->outMin) / (pid->ki + 1e-6f);  // +1e-6避免除零
+    pid->state.integral = constrain(pid->state.integral, -max_integral, max_integral);
+
+
+
     }
 
     // 4. 微分项滤波（一阶低通）
@@ -255,12 +266,13 @@ int16_t PID_Cascade(PID_AngleParam *pid) {
 
 
 
-void PID_Init_Angle( uint8_t name,uint16_t is_inner_loop, PID_AngleParam *pid, int16_t (*GetPWM)(void), float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
+void PID_Init_Angle( uint8_t name,uint16_t is_inner_loop, PID_AngleParam *pid, float (*GetAngle)(void),int16_t (*GetCounter)(void) ,float kp, float ki, float kd,  float outMin,float outMax,void (*SetPWM)(int16_t output))
 {  
     pid->is_inner_loop=is_inner_loop;
     pid->name=name;
     // 设置函数指针  
-    pid->GetPWM = GetPWM; // 初始化获取 PWM 的函数  
+    pid->GetAngle = GetAngle; // 初始化获取 PWM 的函数  
+    pid->GetCounter = GetCounter; // 初始化设置 PWM 的函数 
     pid->SetPWM = SetPWM; // 初始化设置 PWM 的函数 
     // 初始化内环参数  
     pid->kp = kp;  

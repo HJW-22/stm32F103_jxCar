@@ -6,7 +6,7 @@ void Encoder_TIM4_Init(void)
 		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4,ENABLE); //打开TIM2通用定时器外设
 		RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB,ENABLE);//打开GPIOA的外设
 	
-		    //声明结构体
+		//声明结构体
 		GPIO_InitTypeDef GPIO_InitSrtucture;
 		GPIO_InitSrtucture.GPIO_Mode=GPIO_Mode_IPU; //上拉输入模式
 		GPIO_InitSrtucture.GPIO_Pin=GPIO_Pin_6 |GPIO_Pin_7;
@@ -101,14 +101,13 @@ int16_t Encoder_TIM4_Get(void)
 			Temp =TIM_GetCounter(TIM4);
 			TIM_SetCounter(TIM4,0);
 			return  Temp;
-
 }
+
 int16_t Encoder_TIM3_Get(void)
 {
 			int16_t Temp ;
 			Temp =TIM_GetCounter(TIM3);
 			TIM_SetCounter(TIM3,0);
-			return  Temp;
-
+			return  -Temp;
 }
 

@@ -3,10 +3,40 @@
 /* UART收发缓冲大小 */
 #define ESP8622_UART_RX_BUF_SIZE            128
 #define ESP8622_UART_TX_BUF_SIZE            64
+uint16_t esp8266_LoadingFinished_Flag =0;
+
+/*台式(tcp)--->esp8266(串口)--->stm32
+台式--->tcp(透传)--->esp8622---->串口(AT响应)----->stm32--->返回--->关闭透传
 
 
 
+透传:
+AT+CIPMODE=1      // 开启透传模式
+AT+CIPSEND        // 进入透传 
+>                 // 收到">"后进入透传状态  
+示例:\
+targetA = 111;
+AT+CIPMODE=1      // 开启透传模式
+AT+CIPSEND        // 进入透传 
+>targetA                // 收到">"后进入透传状态  
 
+
+
+AT响应：
++IPD,<len>:<data>
+示例：+IPD,10:hello12345
+
+返回:
+AT+CIPSEND=<length>  // 指定发送长度
+>                   // 输入待发送数据
+实例AT+CIPSEND=2  // 指定发送长度
+>OK                  // 输入待发送数据
+
+
+关闭透传
+AT+CIPMODE=0      // 开启透传模式
+
+*/
 typedef struct
 {
     uint8_t buf[ESP8622_UART_RX_BUF_SIZE];              /* 帧接收缓冲 */
@@ -121,8 +151,8 @@ void ESP8266_UART_Init(USART_TypeDef *USARTx, uint32_t Baudrate, uint16_t Preemp
     }
 }
 
-
-
+uint8_t Serial_RxFlag2; // 串口2接收标志  
+char Serial_RxPacket2[100]; // 串口2接收缓冲区  
 /**
  * @brief  USART2中断服务函数（ATK-MW8266D专用）
  * @note   处理ESP8266的多行响应和帧结束判断
@@ -139,21 +169,65 @@ void USART2_IRQHandler(void)
     }
     if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
     {
+        static uint8_t RxState = 0;
+        static uint8_t pRxPacket = 0;
         uint8_t ch = USART_ReceiveData(USART2);
         
-        /* 存储到帧缓冲区 */
-        if(esp8266_rx_frame.sta.len < ESP8622_UART_RX_BUF_SIZE-1)
+        if (esp8266_LoadingFinished_Flag == 0)
         {
-            esp8266_rx_frame.buf[esp8266_rx_frame.sta.len] = ch;
-						esp8266_rx_frame.sta.len++;  
-        }else
-        {
-            esp8266_rx_frame.sta.len = 0;
-            esp8266_rx_frame.buf[esp8266_rx_frame.sta.len]=ch;
-						esp8266_rx_frame.sta.len++;  
+            /* 存储到帧缓冲区 */
+            if(esp8266_rx_frame.sta.len < ESP8622_UART_RX_BUF_SIZE-1)
+            {
+                esp8266_rx_frame.buf[esp8266_rx_frame.sta.len] = ch;
+                            esp8266_rx_frame.sta.len++;  
+            }else
+            {
+                esp8266_rx_frame.sta.len = 0;
+                esp8266_rx_frame.buf[esp8266_rx_frame.sta.len]=ch;
+                            esp8266_rx_frame.sta.len++;  
+            }
+            USART_ClearITPendingBit(USART2, USART_IT_RXNE);
         }
-        USART_ClearITPendingBit(USART2, USART_IT_RXNE);
+        else
+        {
+            uint8_t RxData = ch;
+            
+            if (RxState == 0)
+            {
+                if (RxData == '@' && Serial_RxFlag2 == 0)
+                {
+                    RxState = 1;
+                    pRxPacket = 0;
+                    Serial_RxPacket2[pRxPacket] = '@';
+                    pRxPacket ++;
+                }
+            }
+            else if (RxState == 1)
+            {
+                if (RxData == '\r')
+                {
+                    RxState = 2;
+                }
+                else
+                {
+                    Serial_RxPacket2[pRxPacket] = RxData;
+                    pRxPacket ++;
+                }
+            }
+            else if (RxState == 2)
+            {
+                if (RxData == '\n')
+                {
+                    RxState = 0;
+                    Serial_RxPacket2[pRxPacket] = '\0';
+                    Serial_RxFlag2 = 1;
+                }
+            } 
+            USART_ClearITPendingBit(USART2, USART_IT_RXNE);
+        }
+    
     }
+   
     if (USART_GetITStatus(USART2,USART_IT_IDLE) !=RESET)
     {
         USART_ReceiveData(USART2);

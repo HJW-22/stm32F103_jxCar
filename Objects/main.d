@@ -41,6 +41,7 @@
 .\objects\main.o: .\Hardware\PID_Positional.h
 .\objects\main.o: .\Hardware\OLED_Font.h
 .\objects\main.o: .\System\Timer.h
-.\objects\main.o: .\Hardware\IWDG.h
-.\objects\main.o: .\Hardware\esp8622.h
-.\objects\main.o: .\Hardware\esp8622_uart.h
+.\objects\main.o: .\System\IWDG.h
+.\objects\main.o: .\Hardware\esp8266.h
+.\objects\main.o: .\Hardware\esp8266_uart.h
+.\objects\main.o: .\Hardware\RP.h

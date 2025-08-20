@@ -36,11 +36,13 @@
 ".\objects\encoder.o"
 ".\objects\pid_positional.o"
 ".\objects\serial.o"
-".\objects\iwdg.o"
-".\objects\esp8622.o"
-".\objects\esp8622_uart.o"
+".\objects\esp8266.o"
+".\objects\esp8266_uart.o"
+".\objects\rp.o"
 ".\objects\delay.o"
 ".\objects\timer.o"
+".\objects\iwdg_1.o"
+".\objects\eeprom.o"
 --strict --scatter ".\Objects\project.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers

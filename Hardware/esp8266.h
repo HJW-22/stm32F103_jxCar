@@ -9,7 +9,26 @@
 #define ATK_MW8266D_ETIMEOUT    2   /* ³¬Ê±´íÎó */
 #define ATK_MW8266D_EINVAL      3   /* ²ÎÊý´íÎó */
 
-uint8_t ESP8266_Init(uint32_t baudrate);
+
+
+
+typedef enum 
+{
+    ESP8266_INIT_EOK =0,
+    ESP8266_ATTEST_ERROR =1,
+    ESP8266_JOINWIFIAP_ERROR =2,
+    ESP8266_CONNECTTCPSERVER_ERROR =3,
+    ESP8266_ENTERUNVARNISHED_ERROR =4,
+
+} ESP8266_INIT_ERROR;
+
+
+
+ESP8266_INIT_ERROR ESP8266_Init(uint32_t baudrate);
+void ESP8266_ERROR_Handling(ESP8266_INIT_ERROR this);
+
+
+
 
 
 #endif

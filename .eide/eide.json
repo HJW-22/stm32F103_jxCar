@@ -251,12 +251,6 @@
             "path": "Hardware/_I2C.c"
           },
           {
-            "path": "Hardware/IWDG.h"
-          },
-          {
-            "path": "Hardware/IWDG.c"
-          },
-          {
             "path": "Hardware/esp8266.c"
           },
           {
@@ -267,6 +261,12 @@
           },
           {
             "path": "Hardware/esp8266_uart.h"
+          },
+          {
+            "path": "Hardware/RP.c"
+          },
+          {
+            "path": "Hardware/RP.h"
           }
         ],
         "folders": []
@@ -285,6 +285,18 @@
           },
           {
             "path": "System/Timer.c"
+          },
+          {
+            "path": "System/EEPROM.h"
+          },
+          {
+            "path": "System/EEPROM.c"
+          },
+          {
+            "path": "System/IWDG.c"
+          },
+          {
+            "path": "System/IWDG.h"
           }
         ],
         "folders": []
@@ -415,17 +427,12 @@
         "options": "null",
         "archExtensions": ""
       },
-      "uploader": "STLink",
+      "uploader": "OpenOCD",
       "uploadConfig": {
         "bin": "",
-        "proType": "SWD",
-        "resetMode": "default",
-        "runAfterProgram": true,
-        "speed": 4000,
-        "address": "0x8000000",
-        "elFile": "None",
-        "optionBytes": ".eide/target 1.st.option.bytes.ini",
-        "otherCmds": ""
+        "target": "stm32f1x",
+        "interface": "cmsis-dap",
+        "baseAddr": "0x08000000"
       },
       "uploadConfigMap": {
         "JLink": {
@@ -437,6 +444,17 @@
           },
           "proType": 1,
           "speed": 8000,
+          "otherCmds": ""
+        },
+        "STLink": {
+          "bin": "",
+          "proType": "SWD",
+          "resetMode": "default",
+          "runAfterProgram": true,
+          "speed": 4000,
+          "address": "0x8000000",
+          "elFile": "None",
+          "optionBytes": ".eide/target 1.st.option.bytes.ini",
           "otherCmds": ""
         }
       },

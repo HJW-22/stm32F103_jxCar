@@ -335,35 +335,91 @@ uint8_t atk_mw8266d_disconnect_atkcld(void)
 
 
 
-uint8_t ESP8266_Init(uint32_t baudrate)
+ESP8266_INIT_ERROR ESP8266_Init(uint32_t baudrate)
 {
+    //AT正确的话3,4,6一般不需要报错信息
+
     // 1. 硬件初始化（UART和GPIO）
     ESP8266_UART_Init(USART2, baudrate, 1, 1);
     
     // 2. 测试AT指令
     if(atk_mw8266d_at_test() != ATK_MW8266D_EOK) {
-        return ATK_MW8266D_ERROR;
+        return ESP8266_ATTEST_ERROR;
     }
     
-    // 3. 关闭回显（可选）
-    atk_mw8266d_ate_config(0);
-    
+ 
     // 4. 设置WiFi模式（Station模式）
-    if(atk_mw8266d_set_mode(1) != ATK_MW8266D_EOK) {
-        return ATK_MW8266D_ERROR;
-    }
+    atk_mw8266d_set_mode(1);
+  
+     //3.复位
+    atk_mw8266d_sw_reset();
     
     // 5. 连接WiFi
     if(atk_mw8266d_join_ap("Xiaomi_D351", "Hjwa3b9c") != ATK_MW8266D_EOK) {
-        return ATK_MW8266D_ERROR;
+        return ESP8266_JOINWIFIAP_ERROR;
     }
     
-    // 6. 连接TCP服务器
-    if(atk_mw8266d_connect_tcp_server("192.168.32.32", "8080") != ATK_MW8266D_EOK) {
-        return ATK_MW8266D_ERROR;
+    //6.设置单连接
+    atk_mw8266d_send_at_cmd("AT+CIPMUX=0","OK",500);
+
+    //7. 连接TCP服务器
+    if(atk_mw8266d_connect_tcp_server("192.168.32.32", "8086") != ATK_MW8266D_EOK) {
+        return ESP8266_CONNECTTCPSERVER_ERROR;
     }
+		Delay_ms(800);
+    //8. 进入透传模式
+    if(atk_mw8266d_enter_unvarnished() != ATK_MW8266D_EOK) {
+        return ESP8266_ENTERUNVARNISHED_ERROR;
+    }
+
+    //9. tcp透传测试
+    Serial_Printf(USART2,"test\n\r");
+    esp8266_LoadingFinished_Flag = 1;
+
+    // Delay_ms(800);
+    // //9. 关闭tcp透传
+    // atk_mw8266d_exit_unvarnished();
     
-    return ATK_MW8266D_EOK;
+    
+    
+    return ESP8266_INIT_EOK;
+}
+
+
+void ESP8266_ERROR_Handling(ESP8266_INIT_ERROR this)
+{
+    esp8266_LoadingFinished_Flag = 1;
+switch (this)
+{
+    case  0:
+    Serial_Printf(USART1,"测试成功");
+    
+    break;
+    case  1:
+    Serial_Printf(USART1,"AT测试错误");
+    
+    break;
+    case  2:
+    Serial_Printf(USART1,"加入WIFI错误");
+    
+    break;
+    case  3:
+    Serial_Printf(USART1,"加入tcp服务器错误");
+    
+    break;
+    case  4:
+    Serial_Printf(USART1,"加入tcp透传错误");
+    
+    break;
+
+default:
+    Serial_Printf(USART1,"未知类型");
+    break;
+}
+
+
+
+
 }
 
 

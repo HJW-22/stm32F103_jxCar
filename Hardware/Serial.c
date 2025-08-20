@@ -8,11 +8,11 @@
 
 
 char Serial_RxPacket1[RX_PACKET_MAX_LENGTH + 1];  // +1 用于存储字符串结束符   
-char Serial_RxPacket2[RX_PACKET_MAX_LENGTH + 1]; // 串口2接收缓冲区  
+// char Serial_RxPacket2[RX_PACKET_MAX_LENGTH + 1]; // 串口2接收缓冲区  
 char Serial_RxPacket3[RX_PACKET_MAX_LENGTH + 1]; // 串口3接收缓冲区  
 
 uint8_t Serial_RxFlag1;
-uint8_t Serial_RxFlag2; // 串口2接收标志  
+// uint8_t Serial_RxFlag2; // 串口2接收标志  
 uint8_t Serial_RxFlag3; // 串口3接收标志 
 
 /**

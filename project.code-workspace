@@ -2,6 +2,10 @@
     "folders": [
         {
             "path": "."
+        },
+        {
+            "name": "Exlinkcode",
+            "path": "../../exlinkgaiv1.03/exlinkgai/Exlinkcode"
         }
     ],
     "settings": {
@@ -11,7 +15,9 @@
             "string.h": "c",
             "delay.h": "c",
             "_i2c.h": "c",
-            "esp8266.h": "c"
+            "esp8266.h": "c",
+            "esp8266_uart.h": "c",
+            "rp.h": "c"
         }
     },
     "extensions": {}
