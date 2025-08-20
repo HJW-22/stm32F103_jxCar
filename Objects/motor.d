@@ -30,3 +30,4 @@
 .\objects\motor.o: .\Library\misc.h
 .\objects\motor.o: Hardware\PWM.h
 .\objects\motor.o: C:\Users\16117\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+.\objects\motor.o: Hardware\Encoder.h

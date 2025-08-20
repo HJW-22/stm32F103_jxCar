@@ -33,7 +33,7 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 
 //代码结构编写
 //一类代码完全可以使用hal库
-//二类代码需要一些值,比如arr,psc
+//二类代码需要一些值,比如arr,psc,部分外设面向对象
 //三类代码,面向对象
 //四类代码,面向结果,面向对象
 
@@ -44,14 +44,14 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 /* 128x64 数字符号为8x16 中文为16x16
 --------------OLED显示页面一--------------
     电机X     
-    实际:+0000 P:xx.x
-    目标:+0000 I:xx.x
-    输出:+0000 D:xx.x
+    实:+0000 P:+xx.x
+    目:+0000 I:+xx.x
+    输:+0000 D:+xx.x
 --------------OLED显示页面二--------------
     MPU6050姿态角
     俯仰角:+xxx.xx
     翻滚角:+xxx.xx
-    偏航角:+x xx.xx
+    偏航角:+xxx.xx
 */
 
 /*
@@ -78,7 +78,7 @@ mpu的dma没有写
 // #define MOTORB_DEBUG
 
 //双环pid选项内环还是外环调试(用于调参串口2)
-// #define INNER_DEBUG        //内部
+//#define INNER_DEBUG        //内部
 #define OUTER_DEBUG     //外部
 
 
@@ -176,21 +176,7 @@ float Angle_Get()
 
 
 
-void LED_Init()
-{
-    PWR_BackupAccessCmd(ENABLE);//允许修改RTC 和后备寄存器
 
-	RCC_LSEConfig(RCC_LSE_OFF);//关闭外部低速外部时钟信号功能 后，PC13 PC14 PC15 才可以当普通IO用。
-
-	BKP_TamperPinCmd(DISABLE);//关闭入侵检测功能，也就是 PC13，也可以当普通IO 使用
-
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC,ENABLE);
-    GPIO_InitTypeDef GPIO_InitStart;
-    GPIO_InitStart.GPIO_Pin=GPIO_Pin_13;
-    GPIO_InitStart.GPIO_Mode=GPIO_Mode_Out_PP;
-    GPIO_InitStart.GPIO_Speed=GPIO_Speed_50MHz;
-    GPIO_Init(GPIOC,&GPIO_InitStart);
-}
 
 void Main_Config_OLED()
 {
@@ -216,7 +202,6 @@ void Main_Config_ESP8266()
     
 }
 
-//DMA未写
 void Main_Config_MPU6050()
 {
    MPU6050_Init(I2C2,0);
@@ -225,7 +210,6 @@ void Main_Config_MPU6050()
     //    while (1);
     // }
 }
-
 
 
 void Main_Config()
@@ -279,18 +263,24 @@ void OLED_PIDDisplay()
     OLED_Clear();
 //处理修改显示
 #ifdef MOTORA_DEBUG
-    OLED_ShowString(0, 0,  "调试电机A",OLED_8X16);
+    OLED_ShowString(0, 0,  "电机A",OLED_8X16);
 #endif 
 #ifdef MOTORB_DEBUG
-    OLED_ShowString(0, 0,  "调试电机B",OLED_8X16);
+    OLED_ShowString(0, 0,  "电机B",OLED_8X16);
 #endif
-	OLED_ShowString(0, 16, "实际:",OLED_8X16);
-	OLED_ShowString(0, 32, "目标:",OLED_8X16);
-	OLED_ShowString(0, 48, "输出:",OLED_8X16);
+	OLED_ShowString(0, 16, "实:",OLED_8X16);
+	OLED_ShowString(0, 32, "目:",OLED_8X16);
+	OLED_ShowString(0, 48, "输:",OLED_8X16);
 
-    OLED_ShowString(88, 16, "P:",OLED_8X16);
-    OLED_ShowString(88, 32, "I:",OLED_8X16);
-    OLED_ShowString(88, 48, "D:",OLED_8X16);
+#ifdef INNER_DEBUG
+    OLED_ShowString(72, 0,  "内环",OLED_8X16);
+#endif 
+#ifdef OUTER_DEBUG
+    OLED_ShowString(72, 0,  "外环",OLED_8X16);
+#endif
+    OLED_ShowString(72, 16, "P:",OLED_8X16);
+    OLED_ShowString(72, 32, "I:",OLED_8X16);
+    OLED_ShowString(72, 48, "D:",OLED_8X16);
     OLED_Update_DMA();
     // OLED_Update();
 }
@@ -299,23 +289,49 @@ void OLED_PIDCycleDisplay()
 {
      if (oled_BufDisplayOne_flag)
     {
-        OLED_ShowSignedNum(40, 16, ActualA, 4,OLED_8X16);
-        OLED_ShowSignedNum(40, 32, TargetA, 4,OLED_8X16);
+        #ifdef MOTORA_DEBUG
+        OLED_ShowSignedNum(24, 16, ActualA, 4,OLED_8X16);
+        OLED_ShowSignedNum(24, 32, TargetA, 4,OLED_8X16);
+        #endif 
+       
+        #ifdef MOTORB_DEBUG
+        OLED_ShowSignedNum(24, 16, ActualB, 4,OLED_8X16);
+        OLED_ShowSignedNum(24, 32, TargetB, 4,OLED_8X16);
+        #endif 
         oled_BufDisplayOne_flag=0;
     }
      if (oled_BufDisplayTwo_flag)
     {
-        OLED_ShowSignedNum(40, 48, OutA, 4,OLED_8X16);
-        OLED_ShowUnsignedFloatNum(104, 16, pidA_outer.kp, 1,1,OLED_8X16);
+        #ifdef MOTORA_DEBUG
+        OLED_ShowSignedNum(24, 48, OutA, 4,OLED_8X16);
+        #endif 
+
+        #ifdef MOTORB_DEBUG
+        OLED_ShowSignedNum(24, 48, OutB, 4,OLED_8X16);
+        #endif 
+
+        #ifdef INNER_DEBUG
+        OLED_ShowFloatNum(88, 16, pidA_inner.kp, 2,1,OLED_8X16);
+        #endif 
+        #ifdef OUTER_DEBUG
+        OLED_ShowFloatNum(88, 16, pidA_outer.kp, 2,1,OLED_8X16);
+        #endif
         oled_BufDisplayTwo_flag=0;
     }
      if (oled_BufDisplayThree_flag)
     {
-        OLED_ShowUnsignedFloatNum(104, 32, pidA_outer.ki, 1,1,OLED_8X16);
-        OLED_ShowUnsignedFloatNum(104, 48, pidA_outer.kd, 1,1,OLED_8X16);
+        #ifdef INNER_DEBUG
+        OLED_ShowFloatNum(88, 32, pidA_inner.ki, 2,1,OLED_8X16);
+        OLED_ShowFloatNum(88, 48, pidA_inner.kd, 2,1,OLED_8X16);
+        #endif 
+
+        #ifdef OUTER_DEBUG
+        OLED_ShowFloatNum(88, 32, pidA_outer.ki, 2,1,OLED_8X16);
+        OLED_ShowFloatNum(88, 48, pidA_outer.kd, 2,1,OLED_8X16);
+        #endif 
         oled_BufDisplayThree_flag=0;
     }
-    if (oled_BufDisplay_flag)
+     if (oled_BufDisplay_flag)
     {
         // OLED_UpdateArea(40,16,40,48);
         // OLED_UpdateArea(104,16,24,48);
@@ -381,12 +397,15 @@ void OLED_SerialSend()
 
 void OLED_PIDCycleSend()
 {
-    // Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",pidA_inner.target,pidA_inner.actual,pidA_inner.output,pidA_outer.target,pidA_outer.actual,pidA_outer.output);//串口发送数据
+    #ifdef MOTORA_DEBUG
+    Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",pidA_inner.target,pidA_inner.actual,pidA_inner.output,pidA_outer.target,pidA_outer.actual,pidA_outer.output);//串口发送数据
+    #endif
+    #ifdef MOTORB_DEBUG
     Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",pidB_inner.target,pidB_inner.actual,pidB_inner.output,pidB_outer.target,pidB_outer.actual,pidB_outer.output);//串口发送数据
-    // Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",TargetA,ActualA,OutA,MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
+    #endif
 
 }
-//0.0016
+
 void OLED_MPU6050CycleSend()
 {
     Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",TargetA,ActualA,OutA,MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
@@ -687,7 +706,7 @@ void TIM1_UP_IRQHandler(void)
             #endif // SETLOACTION_MODE
 
             #ifdef ANGLE_MODE
-            MotorControlLoop_Angle();
+            // MotorControlLoop_Angle();
             #endif // ANGLE_MODE
         }
         if(sys_cnt % 100 == 0)oled_BufDisplay_flag=1;
@@ -704,6 +723,23 @@ void TIM1_UP_IRQHandler(void)
             // {
             //     GPIO_WriteBit(GPIOC, GPIO_Pin_13 ,Bit_SET); // 翻转 PA0
             // } 
+            // void LED_Init()
+            // {
+            //     PWR_BackupAccessCmd(ENABLE);//允许修改RTC 和后备寄存器
+
+            //     RCC_LSEConfig(RCC_LSE_OFF);//关闭外部低速外部时钟信号功能 后，PC13 PC14 PC15 才可以当普通IO用。
+
+            //     BKP_TamperPinCmd(DISABLE);//关闭入侵检测功能，也就是 PC13，也可以当普通IO 使用
+
+            //     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC,ENABLE);
+            //     GPIO_InitTypeDef GPIO_InitStart;
+            //     GPIO_InitStart.GPIO_Pin=GPIO_Pin_13;
+            //     GPIO_InitStart.GPIO_Mode=GPIO_Mode_Out_PP;
+            //     GPIO_InitStart.GPIO_Speed=GPIO_Speed_50MHz;
+            //     GPIO_Init(GPIOC,&GPIO_InitStart);
+            // }
+
+            
         }
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);// 根据您的定时器和情况调整
     }
