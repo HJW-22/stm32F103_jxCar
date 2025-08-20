@@ -87,3 +87,10 @@ uint16_t RP_Getvalue(uint8_t RP_Number)
     return ADC_GetConversionValue(ADC1);
     // }
 }
+
+
+
+    // pidA_inner.kp =RP_Getvalue(1)/4095.0*1;
+    // pidA_inner.ki =RP_Getvalue(2)/4095.0*1;
+    // pidA_inner.kp =RP_Getvalue(3)/4095.0*10;
+    // TargetA=RP_Getvalue(4)/4095.0* 1000-100;

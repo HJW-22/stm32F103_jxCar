@@ -18,60 +18,28 @@
 MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 
 
+//程序逻辑编写
+//一类代码 基础的内部外设,比如定时器,看门狗
+//二类代码 基础的外部外设,比如RP,key,led
+//三类代码 普通的内部外设与外部外设联动,比如电机的编码器,pwm输出,oled的i2c,蓝牙的usrt
+//四类代码 进阶的内部外设与外部外设联动,比如wifi,mpu6050,
+
+//最主要的特征
+//一类代码, 基本上可以使用hal库来编写(虽然我的程序是标准库),不需要任何的外部因素,比如key的抖动,rp的可调大小
+//二类代码, 基本上不用考虑很多,但是跟三类代码的区别是不用使用内部的一些外设,只要gpio,顶多中断,从复杂度上来看少很多
+//三类代码, 占用了一些外设,要考量的就很多了,但是跟四类代码相比,少了错误的判断,因为能通过外部观测来看,比如oled出错就是显示不出来
+//四类代码, 加入了错误机制,wifi的纠错码,mpu6050的id读取
 
 
+//代码结构编写
+//一类代码完全可以使用hal库
+//二类代码需要一些值,比如arr,psc
+//三类代码,面向对象
+//四类代码,面向结果,面向对象
 
 
-
-//电机A调试还是电机B调试(仅串口2发送无oled)
-#define MOTORA_DEBUG
-// #define MOTORB_DEBUG
-
-//双环pid选项内环还是外环调试(用于调参串口2)
-
-// #define INNER_DEBUG        //内部
-#define OUTER_DEBUG     //外部
-
-
-
-
-//PID_Init
-//PID_Init_BicyclicParams
-//PID_Init_Angle
-
-// #define SETLOACTION_MODE
-// #define DUALCONTROL_MODE
-#define ANGLE_MODE
-
-// void sendATCommand(char* cmd, uint16_t timeout) {
-//   // 发送命令
-//   Serial_Printf(USART2, "%s\r\n", cmd);  // 确保AT命令以\r\n结尾
-  
-//   while (!Serial_RxFlag2) {
-//     if ((timeout--)==0) {
-//       Serial_Printf(USART1, "CMD %s timeout!\r\n", cmd);
-//       return;
-//     }
-//   }
-//     // 打印接收到的响应
-//     Serial_Printf(USART1, "[DEBUG] CMD: %s\r\nResponse: %s\r\n", cmd, Serial_RxPacket2);
-    
-//     // 解析响应判断是否成功
-//     if (strstr(Serial_RxPacket2, "OK") || strstr(Serial_RxPacket2, "CONNECT")) {
-//         Serial_Printf(USART1, "[INFO] Command success\r\n");
-//     } else {
-//         Serial_Printf(USART1, "[WARN] Command may have failed\r\n");
-//     }
-// }
-// void WIFI_Init() {
-//   sendATCommand("AT", 10000);      // 设置为STA模式
-//   sendATCommand("AT+CWMODE=1", 10000);      // 设置为STA模式
-//   sendATCommand("AT+CWJAP=\"Xiaomi_D351\",\"Hjwa3b9c\"", 50000);  // 连接WiFi
-//   sendATCommand("AT+CIPSTART=\"TCP\",\"192.168.32.32\",8080", 20000);  // 连接服务器
-// }
-
-
-
+//主程序的pid调参,可以使用tcp,oled俩种方式,互相不冲突
+//使用了#define方式,调整调参对象,以下是用户设置
 
 /* 128x64 数字符号为8x16 中文为16x16
 --------------OLED显示页面一--------------
@@ -83,39 +51,73 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
     MPU6050姿态角
     俯仰角:+xxx.xx
     翻滚角:+xxx.xx
-    偏航角:+xxx.xx
---------------OLED显示页面三--------------
+    偏航角:+x xx.xx
+*/
 
+/*
+tcp发送格式 主机--->单片机     @开头 \r\n结尾
+tcp接收格式 单片机--->主机     自己开发
+*/
+
+
+/*尚未完成的地方
+
+
+USART的面向对象编程
+tcp发送和oled  编写过程太过复杂,如果不熟悉整个程序,难以编写
+pid的优化,有很多冗余
+下面的调试有一些问题,需要优化
+tcp的dma没有写
+mpu的dma没有写
 
 */
 
-//统一采用电机A调试 俩者不可共存 
+
+//电机A调试还是电机B调试(仅串口2发送无oled)
+#define MOTORA_DEBUG
+// #define MOTORB_DEBUG
+
+//双环pid选项内环还是外环调试(用于调参串口2)
+// #define INNER_DEBUG        //内部
+#define OUTER_DEBUG     //外部
+
+
+
+
+//PID_Init
+//PID_Init_Angle
+
+// #define SETLOACTION_MODE
+#define ANGLE_MODE
+
+
+
+
+//俩者不可共存 
 #ifdef MOTORA_DEBUG
     #ifdef MOTORB_DEBUG
         #error "MOTORA_DEBUG and MOTORB_DEBUG cannot be defined at the same time!"
     #endif
 #endif
 
-
+//俩者不可共存 
 #ifdef INNER_DEBUG
     #ifdef OUTER_DEBUG
         #error "INNER_DEBUG and OUTER_DEBUG cannot be defined at the same time!"
     #endif
 #endif
 
-
-#if (defined(SETLOACTION_MODE) + defined(DUALCONTROL_MODE) + defined(ANGLE_MODE)) > 1
-    #error "Only one of SETLOACTION_MODE, DUALCONTROL_MODE, or ANGLE_MODE can be defined!"
+//俩者不可共存 
+#ifdef SETLOACTION_MODE
+    #ifdef ANGLE_MODE
+        #error "SETLOACTION_MODE and ANGLE_MODE cannot be defined at the same time!"
+    #endif
 #endif
+
 
 #ifdef SETLOACTION_MODE
     PID_Params pidA,pidB;
 #endif // SETLOACTION_MODE
-
-#ifdef DUALCONTROL_MODE
-    PID_BicyclicParams pidA_inner,pidB_inner;
-    PID_BicyclicParams pidA_outer,pidB_outer;
-#endif // DUALCONTROL_MODE
 
 #ifdef ANGLE_MODE
     PID_AngleParam pidA_inner,pidB_inner;
@@ -123,24 +125,6 @@ MPU6050 MPU6050_Data;	//创建一个结构体用来储存欧拉角
 #endif
 
 
-/*typec方向左B2TIM2 右A1TIM3
-电机的插线反了 即PWMA代表的是电机B
-即PWMB代表的是电机A
-下面的互换就可以
-MotorB
-A8青色 PWMA
-GPIO_Pin_13 AIN1
-GPIO_Pin_12 AIN2
-MotorA
-A11橙色 PWMB
-GPIO_Pin_15 BIN1
-GPIO_Pin_14 BIN2
-*/
-
-/*串口说明 串口1发送 串口2修改
-串口2用来发送PID的值 即Target Actual Out 图形化调试  为PB8与PB9
-串口1用来修改PID的值 发送格式为@XXXX 加回车  具体串口会写  为PA3与PA2
-*/
 
 
 //   ------------------主函数逻辑判断------------------
@@ -208,35 +192,59 @@ void LED_Init()
     GPIO_Init(GPIOC,&GPIO_InitStart);
 }
 
-
-void Main_Config()
+void Main_Config_OLED()
 {
-    ESP8266_INIT_ERROR ret= ESP8266_INIT_EOK ;
-    OLED_Init();
+    OLED_Init(I2C1,1);
+    // if (OLED_ID() == 0)
+    // {
+    //    while (1);
+    // }
     OLED_DMA_Init();
     OLED_ShowString( (128-96)/2, (64-16)/2, "系统初始化中", OLED_8X16);
-    // OLED_Update();
     OLED_Update_DMA();
-    Delay_ms(800);
-    Serial_Init(); 
-    
+    Delay_ms(10);
+}
+
+void Main_Config_ESP8266()
+{
+    ESP8266_INIT_ERROR ret= ESP8266_INIT_EOK;
     ret = ESP8266_Init(115200);
     if (ret !=ESP8266_INIT_EOK)
     {
         ESP8266_ERROR_Handling(ret);
     }
     
+}
+
+//DMA未写
+void Main_Config_MPU6050()
+{
+   MPU6050_Init(I2C2,0);
+    // if (MPU6050_ID() == 0)
+    // {
+    //    while (1);
+    // }
+}
+
+
+
+void Main_Config()
+{
+    Main_Config_OLED();
+    Main_Config_ESP8266();
+    Main_Config_MPU6050();
     
-    Motor_Init();
-    Encoder_TIM4_Init();
-    Encoder_TIM3_Init();
-    // USART2_DMA_Init();
-    //LED_Init();
+    //串口初始化
+    Serial_Init(); 
+    //电机初始化(10K)
+    Motor_Init(10,72);
+    
+    //一些人机交互 RP有硬件设计有问题不要使用
+    // RP_Init();
+    // LED_Init();
 
-    MPU6050_Init(GPIOB,GPIO_Pin_10,GPIO_Pin_11);
-    RP_Init();
+    //最后初始化,若先进入中断,此时外设尚未初始化,那就会出错
     Timer_Init();
-
 
     #ifdef SETLOACTION_MODE
     // 初始化电机A的PID
@@ -245,26 +253,7 @@ void Main_Config()
     PID_Init(&pidB, 0.07,0.02,0.1,PID_VERSION_VARIABLE_INTEGRAL,PID_VERSION_DIFFERENTIAL_FIRST_AND_INCOMPLETE,0.9);
     #endif // SETLOACTION_MODE
     
-    #ifdef DUALCONTROL_MODE
-
-   
-    #ifdef INNER_DEBUG
-    PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
-    PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM4_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
-    #endif // INNER_DEBUG
-
-    //一般来说如果单环的参数不可以使用到双环内
-    #ifdef OUTER_DEBUG
-    PID_Init_BicyclicParams(MOTOR_A,&pidA_inner,Encoder_TIM3_Get,0.4,0.15,0,-30,30,MotorA_SetSpeed);
-    PID_Init_BicyclicParams(MOTOR_B,&pidB_inner,Encoder_TIM4_Get,0.4,0.1,0,-20,20,MotorB_SetSpeed);
-    PID_Init_BicyclicParams(MOTOR_A,&pidA_outer,NULL,0.05,0,0.05,-100,100,NULL);
-    PID_Init_BicyclicParams(MOTOR_B,&pidB_outer,NULL,0.4,0,0.3,-100,100,NULL);
-    #endif // OUTER_DEBUG
-
-    #endif // DUALCONTROL_MODE
-
     #ifdef ANGLE_MODE
-
     #ifdef INNER_DEBUG
     PID_Init_Angle(MOTOR_A,1,&pidA_inner,NULL,Encoder_TIM4_Get,0.2,0,0.9,-100,100,MotorA_SetSpeed);
     PID_Init_Angle(MOTOR_B,1,&pidB_inner,NULL,Encoder_TIM3_Get,0.2,0,0.9,-100,100,MotorB_SetSpeed);
@@ -389,37 +378,18 @@ void OLED_SerialSend()
     #endif // USART3_FLAG 
 }
 
+
 void OLED_PIDCycleSend()
 {
-//    static char buffer[32];
-
-//    #ifdef MOTORA_DEBUG
-//    int len =snprintf(buffer,sizeof(buffer),"%.2f,%.2f,%.2f\r\n", TargetA, ActualA, OutA);
-//    #endif // MotorA_Debug
-//    
-//    #ifdef MOTORB_DEBUG
-//    int len =snprintf(buffer,sizeof(buffer),"%.2f,%.2f,%.2f\r\n", TargetA, ActualA, OutA);
-//    #endif // MotorB_Debug
-//  
-//    // 确保长度不超过缓冲区大小  
-//    if (len >= sizeof(buffer)) {  
-//        // 如果数据太长，可以做一些处理  
-//        // 例如：截断 or 报错  
-//        len = sizeof(buffer) - 1; // 截断并保留结尾符  
-//    }  
-//    
-//    // 发送格式化数据  
-//    // USART2_DMA_Send((uint8_t *)buffer, len);  
     // Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",pidA_inner.target,pidA_inner.actual,pidA_inner.output,pidA_outer.target,pidA_outer.actual,pidA_outer.output);//串口发送数据
     Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",pidB_inner.target,pidB_inner.actual,pidB_inner.output,pidB_outer.target,pidB_outer.actual,pidB_outer.output);//串口发送数据
-
     // Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",TargetA,ActualA,OutA,MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
 
 }
 //0.0016
 void OLED_MPU6050CycleSend()
 {
-    // Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",TargetA,ActualA,OutA,MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
+    Serial_Printf(USART2,"%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",TargetA,ActualA,OutA,MPU6050_Data.roll,MPU6050_Data.pitch,MPU6050_Data.yaw);//串口发送数据
 }
 
 void Serial_change()
@@ -669,7 +639,7 @@ int main(void){
    Delay_ms(10);
     Main_Config();
     //20ms看门
-    // IWDG_Config(IWDG_Prescaler_16,100);
+    //IWDG_Config(IWDG_Prescaler_16,100);
     while (1) {
         if (page1_flag) {
             if (page1_firstEntry) {
@@ -687,25 +657,9 @@ int main(void){
                 page2_firstEntry = 0;
             } else {
                OLED_MPU6050CycleDisplay();
-               
+               OLED_MPU6050CycleSend();
             }
         }
-
-        // pidA_inner.kp =RP_Getvalue(1)/4095.0*1;
-        // pidA_inner.ki =RP_Getvalue(2)/4095.0*1;
-        // pidA_inner.kp =RP_Getvalue(3)/4095.0*10;
-        // TargetA=RP_Getvalue(4)/4095.0* 1000-100;
-
-        
-
-        if (pid_timingFlag)
-        {
-            // OLED_MPU6050CycleSend();
-            pid_timingFlag=0;
-        }
-		// Serial_SendByte('s',USART2);
-		// Serial_Printf(USART2,"AT\r\n");
-        // Serial_SendByte(0x55,USART2);
         //串口改变目标值
         Serial_change();
         IWDG_Feed();
@@ -721,32 +675,26 @@ void TIM1_UP_IRQHandler(void)
     static uint16_t sys_cnt=0;
     if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) 
     {
-        if (sys_cnt==0);
         sys_cnt++;
         if(sys_cnt % 10 == 0){
-
 			//软件i2c 0.00085
             //硬件i2c(400k) 0.00124
             MPU6050_Get_Angle_Plus(&MPU6050_Data);
             angle_temp=MPU6050_Data.roll;
+
             #ifdef SETLOACTION_MODE
             MotorControlLoop_SetLoaction();
             #endif // SETLOACTION_MODE
 
-            #ifdef DUALCONTROL_MODE
-            MotorControlLoop_Dual();
-            #endif // DUALCONTROL_MODE
-
             #ifdef ANGLE_MODE
             MotorControlLoop_Angle();
             #endif // ANGLE_MODE
-            pid_timingFlag=1;
         }
         if(sys_cnt % 100 == 0)oled_BufDisplay_flag=1;
         if(sys_cnt % 24 == 0)oled_BufDisplayOne_flag=1;
         if(sys_cnt % 48 == 0)oled_BufDisplayTwo_flag=1;
         if(sys_cnt % 72 == 0)oled_BufDisplayThree_flag=1;
-        //测试可行性,1s 闪烁led(pc13)
+        //测试可行性,1s 闪烁led(pc13),占用RTC口,需要在主程序初始化LED_Init();
         if(sys_cnt % 1000 == 0)
         {
             // if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == Bit_SET )
@@ -756,7 +704,6 @@ void TIM1_UP_IRQHandler(void)
             // {
             //     GPIO_WriteBit(GPIOC, GPIO_Pin_13 ,Bit_SET); // 翻转 PA0
             // } 
-        
         }
         TIM_ClearITPendingBit(TIM1, TIM_IT_Update);// 根据您的定时器和情况调整
     }

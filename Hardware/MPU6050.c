@@ -188,9 +188,9 @@ GPIOx:选择你的GPIO
 SCl:选择你的GPIO(choose your GPIO)
 SDA:选择你的GPIO(choose your GPIO)
 注意:SCL和SDA来自同一组GPIO口(notice:SCL and SDA come from a same GPIO port)*/
-void MPU6050_Init(GPIO_TypeDef* GPIOx,uint16_t SCl,uint16_t SDA){
-
-    MPU6050_I2C = Create_HI2C(I2C2,MPU6050_ADDRESS);//创建软件IIC
+void MPU6050_Init(I2C_TypeDef *I2Cx,uint8_t AFIO_EN)
+{
+    MPU6050_I2C = Create_HI2C(I2Cx,MPU6050_ADDRESS,AFIO_EN);//创建硬件IIC
 
     MPU6050_InitTypeDef MPU6050_init_Struct;
     MPU6050_init_Struct.SMPLRT_Rate = 100;            //采样率Hz

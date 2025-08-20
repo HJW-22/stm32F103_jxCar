@@ -1,7 +1,7 @@
 #include "stm32f10x.h"                  // Device header
 #include "PWM.h"
 
-void PWM_init(void)
+void PWM_init(int16_t ARR,int16_t PSC)
 {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2,ENABLE); //打开TIM1通用定时器外设
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA,ENABLE); //打开GPIOA外设
@@ -32,7 +32,7 @@ void PWM_init(void)
 	TIM_OCInitStructure.TIM_OCMode=TIM_OCMode_PWM1;
 	TIM_OCInitStructure.TIM_OCPolarity=TIM_OCPolarity_High;
 	TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-	TIM_OCInitStructure.TIM_Pulse= CCR;                //CCR
+	TIM_OCInitStructure.TIM_Pulse= 0;                //CCR
 	TIM_OC1Init(TIM2,&TIM_OCInitStructure);
 	TIM_OC2Init(TIM2,&TIM_OCInitStructure);
 	
@@ -46,18 +46,19 @@ void PWM_init(void)
 
 
 }
-void TIM2_NVIC_Init(){
-	TIM_ITConfig(TIM2,TIM_IT_Update,ENABLE);//使能TIM中断源，即寄存器值1操作
+
+// void TIM2_NVIC_Init(){
+// 	TIM_ITConfig(TIM2,TIM_IT_Update,ENABLE);//使能TIM中断源，即寄存器值1操作
 	
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); //优先级配置为2，即抢占和从优先级为3:3
-	//中断结构体初始化
-	NVIC_InitTypeDef NVIC_InitStructure; //声明结构体
-	NVIC_InitStructure.NVIC_IRQChannel=TIM2_IRQn; //选择中断
-	NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;//打开中断
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=2; //抢占优先级为2
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority=1; //从优先级
-	NVIC_Init(&NVIC_InitStructure); 
-}
+// 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2); //优先级配置为2，即抢占和从优先级为3:3
+// 	//中断结构体初始化
+// 	NVIC_InitTypeDef NVIC_InitStructure; //声明结构体
+// 	NVIC_InitStructure.NVIC_IRQChannel=TIM2_IRQn; //选择中断
+// 	NVIC_InitStructure.NVIC_IRQChannelCmd=ENABLE;//打开中断
+// 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=2; //抢占优先级为2
+// 	NVIC_InitStructure.NVIC_IRQChannelSubPriority=1; //从优先级
+// 	NVIC_Init(&NVIC_InitStructure); 
+// }
 
 
 void PWM_SetCompare1(uint16_t Compare)

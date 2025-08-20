@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include "_I2C.h"
 #include "stm32f10x_dma.h"
+
 I2C_BUS OLED_I2C;
 
 
@@ -26,19 +27,22 @@ void OLED_Write_Continue_Wrapper(uint8_t RegAddress, uint16_t Count, uint8_t* Da
 
 #define OLED_ADDRESS 0x3C // OLED I2C地址
 
+uint8_t OLED_DisplayBuf[8][128];
+
+
+
 // #define OLED_CHRONOLOGY_DELAY_FLAG
 
-#ifdef OLED_CHRONOLOGY_DELAY_FLAG
-#define OLED_CHRONOLOGY_DELAY_TIME 1 // 纳秒(us)为单位延时
-uint8_t OLED_Delay = OLED_CHRONOLOGY_DELAY_TIME;
-#endif
+// #ifdef OLED_CHRONOLOGY_DELAY_FLAG
+// #define OLED_CHRONOLOGY_DELAY_TIME 1 // 纳秒(us)为单位延时
+// uint8_t OLED_Delay = OLED_CHRONOLOGY_DELAY_TIME;
+// #endif
 
-#define OLED_GPIO_GROUP GPIOB
-#define OLED_GPIO_CLK   RCC_APB2Periph_GPIOB
-#define OLED_I2C_SCL    GPIO_Pin_8
-#define OLED_I2C_SDA    GPIO_Pin_9
+// #define OLED_GPIO_GROUP GPIOB
+// #define OLED_GPIO_CLK   RCC_APB2Periph_GPIOB
+// #define OLED_I2C_SCL    GPIO_Pin_8
+// #define OLED_I2C_SDA    GPIO_Pin_9
 
-uint8_t OLED_DisplayBuf[8][128];
 
 /*
 //------------------------软件I2C基本时序部分------------------------
@@ -140,17 +144,12 @@ void OLED_WriteData(uint8_t address, uint8_t *Data, uint8_t Count)
 
 
 //------------------------软件I2C通讯部分------------------------
-void OLED_GPIO_Init(void)
-{
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO,ENABLE);  //开启AFIO时钟
-    GPIO_PinRemapConfig(GPIO_Remap_I2C1,ENABLE);  
-    OLED_I2C = Create_HI2C(I2C1,OLED_ADDRESS);//创建软件IIC
-}
+
 /* OLED初始化 */
-void OLED_Init(void)
+void OLED_Init(I2C_TypeDef *I2Cx,uint8_t AFIO_EN)
 {
     // 硬件初始化
-    OLED_GPIO_Init();  // 初始化OLED的GPIO（I2C/SPI接口）
+    OLED_I2C = Create_HI2C(I2C1,OLED_ADDRESS,1);//创建软件IIC
     Delay_ms(100);      // 重要延时，等待OLED电源稳定
     
     // 软件初始化（SSD1306命令配置）
@@ -718,10 +717,18 @@ void OLED_Printf(int16_t X, int16_t Y, uint8_t FontSize, char *format, ...)
 }
 
 
+uint8_t OLED_ID(void)
+{
+  return 1;
+}
 
 
 
+
+// OLED DMA部分
 volatile uint8_t OLED_DMA_TransferComplete = 0;
+
+
 
 // DMA初始化
 void OLED_DMA_Init(void)

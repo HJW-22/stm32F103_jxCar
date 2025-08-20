@@ -12,7 +12,7 @@
 #define OLED_FILLED				1
 
 
-void OLED_Init(void);
+void OLED_Init(I2C_TypeDef *I2Cx,uint8_t AFIO_EN);
 
 void OLED_Clear(void);
 void OLED_ClearArea(int16_t X, int16_t Y, uint8_t Width, uint8_t Height);
@@ -32,6 +32,8 @@ void OLED_ShowBinNum(int16_t X, int16_t Y, uint32_t Number, uint8_t Length, uint
 void OLED_ShowFloatNum(int16_t X, int16_t Y, float Number, uint8_t IntLength, uint8_t FraLength, uint8_t FontSize);
 void OLED_ShowImage(int16_t X, int16_t Y, int16_t Width, int16_t Height,const uint8_t *Image);
 void OLED_ShowUnsignedFloatNum(int16_t X, int16_t Y, float Number, uint8_t IntLength, uint8_t FraLength, uint8_t FontSize);
+
+uint8_t OLED_ID(void);
 
 
 // DMA´«Êä×´Ì¬±ê¼Ç

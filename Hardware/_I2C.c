@@ -415,7 +415,7 @@ I2C_BUS Create_SI2C(GPIO_TypeDef *GPIOx, uint16_t SCL, uint16_t SDA, uint8_t Add
 I2Cx:I2C1 I2C2选择硬件I2C
 Address:一般是地址没有进行移位过的7位地址
 */
-I2C_BUS Create_HI2C(I2C_TypeDef *I2Cx, uint8_t Address)
+I2C_BUS Create_HI2C(I2C_TypeDef *I2Cx, uint8_t Address,uint8_t AFIO_EN)
 {
     I2C_BUS bus = {0};
     bus.Private = malloc(sizeof(I2C_Private));
@@ -440,17 +440,54 @@ I2C_BUS Create_HI2C(I2C_TypeDef *I2Cx, uint8_t Address)
     else
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB|RCC_APB2Periph_AFIO, ENABLE);
 
+     if (AFIO_EN)
+    {
+        if (I2Cx == I2C1)
+        {
+            GPIO_PinRemapConfig(GPIO_Remap_I2C1,ENABLE);
+        }
+        else
+        {
+            //F10x没有这个功能
+            //GPIO_PinRemapConfig(I2C2,ENABLE);     
+        }
+        
+    }
     GPIO_InitTypeDef GPIO_InitStructure;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD; //!!!!!! OD mode!!!!!!!!开漏模式
-    if (I2Cx == I2C1)
-        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
-    else
-        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
 
+    if (I2Cx == I2C1)
+    {
+        if (AFIO_EN)
+        {
+            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
+            GPIO_Init(GPIOB, &GPIO_InitStructure);
+        }
+        else 
+        {
+            GPIO_InitStructure.GPIO_Pin=GPIO_Pin_6 | GPIO_Pin_7;
+            GPIO_Init(GPIOB, &GPIO_InitStructure);
+        } 
+    }
+    else
+    {
+        if (AFIO_EN)
+        {
+            // 重映射后的引脚：PB10, PB11
+            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10  | GPIO_Pin_11;
+            GPIO_Init(GPIOB, &GPIO_InitStructure);
+        }
+        else 
+        {
+            // 默认引脚：PB10, PB11 (I2C2默认就是这些引脚)
+            GPIO_InitStructure.GPIO_Pin=GPIO_Pin_10  | GPIO_Pin_11;
+            GPIO_Init(GPIOB, &GPIO_InitStructure);
+        } 
+    }
+  
     I2C_InitTypeDef I2C_InitStructure;
     I2C_InitStructure.I2C_Mode                = I2C_Mode_I2C; // Mode
     I2C_InitStructure.I2C_ClockSpeed          = 400000;       // I2C速度设置

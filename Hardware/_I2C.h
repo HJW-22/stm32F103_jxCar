@@ -28,7 +28,7 @@ typedef struct I2C_BUS
 
 //初始化函数
 I2C_BUS Create_SI2C(GPIO_TypeDef* GPIOx,uint16_t SCL,uint16_t SDA,uint8_t Address);					//创建软件I2C对象,create a softwere I2C
-I2C_BUS Create_HI2C(I2C_TypeDef* I2Cx,uint8_t Address);												//创建硬件I2C对象,create a hardware I2C
+I2C_BUS Create_HI2C(I2C_TypeDef* I2Cx,uint8_t Address,uint8_t AFIO_EN);												//创建硬件I2C对象,create a hardware I2C
 
 
 #endif

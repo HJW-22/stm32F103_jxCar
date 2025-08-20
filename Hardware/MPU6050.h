@@ -24,7 +24,7 @@ typedef struct MPU6050
 
 
 
-void MPU6050_Init(GPIO_TypeDef* GPIOx,uint16_t SCl,uint16_t SDA);
+void MPU6050_Init(I2C_TypeDef *I2Cx,uint8_t AFIO_EN);
 void MPU6050_Get_Angle(MPU6050* this);
 float MPU6050_GetTemp(void);
 uint8_t MPU6050_ID(void);
