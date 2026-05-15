@@ -1,17 +1,58 @@
-# dot files
-/.vscode/launch.json
-/.settings
-/.eide/log
-/.eide.usr.ctx.json
+# ========================================
+# 1. Keil MDK 专属忽略 (解决打开文件就变动的元凶)
+# ========================================
+# 忽略编译产生的中间文件和目录
+Objects/
+Listings/
 
-/Objects
-Objects
-# project out
-/build
-/bin
-/obj
-/out
+# 忽略 Keil 自动生成的界面布局、调试配置和备份文件
+*.uvguix.*
+*.uvoptx
+*.bak
+*.dep
+*.iex
+*.scvd
+*.dbgconf
 
-# eide template
+# 忽略调试产生的日志文件
+JLinkLog.txt
+project_Sequences_*.log
+*.log
+
+# ========================================
+# 2. 编译输出文件 (通用)
+# ========================================
+/build/
+/bin/
+/obj/
+/out/
+*.o
+*.d
+*.crf
+*.axf
+*.elf
+*.bin
+*.hex
+*.map
+*.htm
+*.lst
+
+# ========================================
+# 3. VS Code & EIDE 专属忽略
+# ========================================
+.eide/log/
+.eide.usr.ctx.json
 *.ept
 *.eide-template
+.vscode/keil-assistant.log
+.vscode/.Browse.VC.db
+.vscode/ipch/
+
+# 【注意】如果你连当前工作区都不想上传，取消下面这行的注释
+# *.code-workspace
+
+# ========================================
+# 4. 操作系统产生的缓存文件
+# ========================================
+.DS_Store
+Thumbs.db
