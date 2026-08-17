@@ -255,7 +255,7 @@ targets:
             language-c: c99
             language-cpp: c++11
             link-time-optimization: false
-            optimization: level-0
+            optimization: level-2
           global:
             output-debug-info: enable
             use-microLIB: false

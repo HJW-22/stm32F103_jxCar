@@ -381,7 +381,7 @@
           </LDads>
         </TargetArmAds>
       </TargetOption>
-                <Groups>
+      <Groups>
         <Group>
           <GroupName>1_Core</GroupName>
           <Files>
@@ -852,7 +852,7 @@
             </File>
           </Files>
         </Group>
-          </Groups>
+      </Groups>
     </Target>
   </Targets>
 
