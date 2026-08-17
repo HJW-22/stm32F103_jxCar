@@ -8,108 +8,113 @@ virtualFolder:
   name: <virtual_root>
   files: []
   folders:
-    - name: Library
+    - name: 1_Core
       files:
-        - path: Library/misc.c
-        - path: Library/misc.h
-        - path: Library/stm32f10x_adc.c
-        - path: Library/stm32f10x_adc.h
-        - path: Library/stm32f10x_bkp.c
-        - path: Library/stm32f10x_bkp.h
-        - path: Library/stm32f10x_can.c
-        - path: Library/stm32f10x_can.h
-        - path: Library/stm32f10x_cec.c
-        - path: Library/stm32f10x_cec.h
-        - path: Library/stm32f10x_crc.c
-        - path: Library/stm32f10x_crc.h
-        - path: Library/stm32f10x_dac.c
-        - path: Library/stm32f10x_dac.h
-        - path: Library/stm32f10x_dbgmcu.c
-        - path: Library/stm32f10x_dbgmcu.h
-        - path: Library/stm32f10x_dma.c
-        - path: Library/stm32f10x_dma.h
-        - path: Library/stm32f10x_exti.c
-        - path: Library/stm32f10x_exti.h
-        - path: Library/stm32f10x_flash.c
-        - path: Library/stm32f10x_flash.h
-        - path: Library/stm32f10x_fsmc.c
-        - path: Library/stm32f10x_fsmc.h
-        - path: Library/stm32f10x_gpio.c
-        - path: Library/stm32f10x_gpio.h
-        - path: Library/stm32f10x_i2c.c
-        - path: Library/stm32f10x_i2c.h
-        - path: Library/stm32f10x_iwdg.c
-        - path: Library/stm32f10x_iwdg.h
-        - path: Library/stm32f10x_pwr.c
-        - path: Library/stm32f10x_pwr.h
-        - path: Library/stm32f10x_rcc.c
-        - path: Library/stm32f10x_rcc.h
-        - path: Library/stm32f10x_rtc.c
-        - path: Library/stm32f10x_rtc.h
-        - path: Library/stm32f10x_sdio.c
-        - path: Library/stm32f10x_sdio.h
-        - path: Library/stm32f10x_spi.c
-        - path: Library/stm32f10x_spi.h
-        - path: Library/stm32f10x_tim.c
-        - path: Library/stm32f10x_tim.h
-        - path: Library/stm32f10x_usart.c
-        - path: Library/stm32f10x_usart.h
-        - path: Library/stm32f10x_wwdg.c
-        - path: Library/stm32f10x_wwdg.h
+        - path: 1_Core/core_cm3.h
+        - path: 1_Core/stm32f10x.h
+        - path: 1_Core/system_stm32f10x.c
+        - path: 1_Core/system_stm32f10x.h
+        - path: 1_Core/startup_stm32f10x_md.s
       folders: []
-    - name: Start
+    - name: 2_Library
       files:
-        - path: Start/core_cm3.c
-        - path: Start/core_cm3.h
-        - path: Start/stm32f10x.h
-        - path: Start/system_stm32f10x.c
-        - path: Start/system_stm32f10x.h
-        - path: Start/startup_stm32f10x_md.s
+        - path: 2_Library/misc.c
+        - path: 2_Library/misc.h
+        - path: 2_Library/stm32f10x_adc.c
+        - path: 2_Library/stm32f10x_adc.h
+        - path: 2_Library/stm32f10x_bkp.c
+        - path: 2_Library/stm32f10x_bkp.h
+        - path: 2_Library/stm32f10x_can.c
+        - path: 2_Library/stm32f10x_can.h
+        - path: 2_Library/stm32f10x_cec.c
+        - path: 2_Library/stm32f10x_cec.h
+        - path: 2_Library/stm32f10x_crc.c
+        - path: 2_Library/stm32f10x_crc.h
+        - path: 2_Library/stm32f10x_dac.c
+        - path: 2_Library/stm32f10x_dac.h
+        - path: 2_Library/stm32f10x_dbgmcu.c
+        - path: 2_Library/stm32f10x_dbgmcu.h
+        - path: 2_Library/stm32f10x_dma.c
+        - path: 2_Library/stm32f10x_dma.h
+        - path: 2_Library/stm32f10x_exti.c
+        - path: 2_Library/stm32f10x_exti.h
+        - path: 2_Library/stm32f10x_flash.c
+        - path: 2_Library/stm32f10x_flash.h
+        - path: 2_Library/stm32f10x_fsmc.c
+        - path: 2_Library/stm32f10x_fsmc.h
+        - path: 2_Library/stm32f10x_gpio.c
+        - path: 2_Library/stm32f10x_gpio.h
+        - path: 2_Library/stm32f10x_i2c.c
+        - path: 2_Library/stm32f10x_i2c.h
+        - path: 2_Library/stm32f10x_iwdg.c
+        - path: 2_Library/stm32f10x_iwdg.h
+        - path: 2_Library/stm32f10x_pwr.c
+        - path: 2_Library/stm32f10x_pwr.h
+        - path: 2_Library/stm32f10x_rcc.c
+        - path: 2_Library/stm32f10x_rcc.h
+        - path: 2_Library/stm32f10x_rtc.c
+        - path: 2_Library/stm32f10x_rtc.h
+        - path: 2_Library/stm32f10x_sdio.c
+        - path: 2_Library/stm32f10x_sdio.h
+        - path: 2_Library/stm32f10x_spi.c
+        - path: 2_Library/stm32f10x_spi.h
+        - path: 2_Library/stm32f10x_tim.c
+        - path: 2_Library/stm32f10x_tim.h
+        - path: 2_Library/stm32f10x_usart.c
+        - path: 2_Library/stm32f10x_usart.h
+        - path: 2_Library/stm32f10x_wwdg.c
+        - path: 2_Library/stm32f10x_wwdg.h
       folders: []
-    - name: User
+    - name: 3_System
       files:
-        - path: User/main.c
-        - path: User/stm32f10x_conf.h
-        - path: User/stm32f10x_it.c
-        - path: User/stm32f10x_it.h
+        - path: 3_System/delay.c
+        - path: 3_System/delay.h
+        - path: 3_System/timer.c
+        - path: 3_System/timer.h
+        - path: 3_System/iwdg.c
+        - path: 3_System/iwdg.h
       folders: []
-    - name: Hardware
+    - name: 4_BSP
       files:
-        - path: Hardware/OLED.c
-        - path: Hardware/OLED.h
-        - path: Hardware/OLED_Font.c
-        - path: Hardware/OLED_Font.h
-        - path: Hardware/PWM.c
-        - path: Hardware/PWM.h
-        - path: Hardware/Motor.c
-        - path: Hardware/Motor.h
-        - path: Hardware/Encoder.c
-        - path: Hardware/Encoder.h
-        - path: Hardware/MPU6050.c
-        - path: Hardware/MPU6050.h
-        - path: Hardware/PID_Positional.c
-        - path: Hardware/PID_Positional.h
-        - path: Hardware/Serial.c
-        - path: Hardware/Serial.h
-        - path: Hardware/_I2C.h
-        - path: Hardware/_I2C.c
-        - path: Hardware/esp8266.c
-        - path: Hardware/esp8266.h
-        - path: Hardware/esp8266_uart.c
-        - path: Hardware/esp8266_uart.h
-        - path: Hardware/RP.c
-        - path: Hardware/RP.h
+        - path: 4_BSP/bsp_i2c.c
+        - path: 4_BSP/bsp_i2c.h
+        - path: 4_BSP/bsp_usart.c
+        - path: 4_BSP/bsp_usart.h
       folders: []
-    - name: System
+    - name: 5_Hardware
       files:
-        - path: System/Delay.c
-        - path: System/Delay.h
-        - path: System/Timer.h
-        - path: System/Timer.c
-        - path: System/EEPROM.h
-        - path: System/EEPROM.c
-        - path: System/IWDG.c
-        - path: System/IWDG.h
+        - path: 5_Hardware/oled.c
+        - path: 5_Hardware/oled.h
+        - path: 5_Hardware/oled_font.c
+        - path: 5_Hardware/oled_font.h
+        - path: 5_Hardware/pwm.c
+        - path: 5_Hardware/pwm.h
+        - path: 5_Hardware/motor.c
+        - path: 5_Hardware/motor.h
+        - path: 5_Hardware/encoder.c
+        - path: 5_Hardware/encoder.h
+        - path: 5_Hardware/mpu6050.c
+        - path: 5_Hardware/mpu6050.h
+        - path: 5_Hardware/eeprom.c
+        - path: 5_Hardware/eeprom.h
+        - path: 5_Hardware/rp.c
+        - path: 5_Hardware/rp.h
+        - path: 5_Hardware/esp8266.c
+        - path: 5_Hardware/esp8266.h
+        - path: 5_Hardware/esp8266_uart.c
+        - path: 5_Hardware/esp8266_uart.h
+      folders: []
+    - name: 6_Algorithm
+      files:
+        - path: 6_Algorithm/pid.c
+        - path: 6_Algorithm/pid.h
+      folders: []
+    - name: 7_User
+      files:
+        - path: 7_User/main.c
+        - path: 7_User/stm32f10x_conf.h
+        - path: 7_User/stm32f10x_it.c
+        - path: 7_User/stm32f10x_it.h
       folders: []
 dependenceList: []
 outDir: build
@@ -122,18 +127,20 @@ targets:
         - USE_STDPERIPH_DRIVER
         - STM32F10X_MD
       incList:
-        - Start
-        - User
-        - Library
-        - Hardware
-        - System
+        - 1_Core
+        - 2_Library
+        - 3_System
+        - 4_BSP
+        - 5_Hardware
+        - 6_Algorithm
+        - 7_User
         - .cmsis/include
         - RTE/_Target 1
       libList: []
     excludeList: []
     settings:
       debugger: cortex-debug
-    toolchain: AC5
+    toolchain: AC6
     toolchainConfigMap:
       AC5:
         archExtensions: ""
@@ -231,6 +238,49 @@ targets:
               mem:
                 size: "0x0"
                 startAddr: "0x0"
+              tag: IROM
+        useCustomScatterFile: false
+      AC6:
+        archExtensions: ""
+        cpuType: Cortex-M3
+        floatingPointHardware: none
+        options:
+          version: 3
+          afterBuildTasks: []
+          asm-compiler:
+            $use: asm-auto
+            misc-controls: ""
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            language-c: c99
+            language-cpp: c++11
+            link-time-optimization: false
+            optimization: level-0
+          global:
+            output-debug-info: enable
+            use-microLIB: false
+          linker:
+            $outputTaskExcludes:
+              - .bin
+            misc-controls: --diag_suppress=L6329
+            output-format: elf
+        scatterFilePath: <YOUR_SCATTER_FILE>.sct
+        storageLayout:
+          RAM:
+            - id: 1
+              isChecked: true
+              mem:
+                size: "0x5000"
+                startAddr: "0x20000000"
+              noInit: false
+              tag: IRAM
+          ROM:
+            - id: 1
+              isChecked: true
+              isStartup: true
+              mem:
+                size: "0x10000"
+                startAddr: "0x08000000"
               tag: IROM
         useCustomScatterFile: false
     uploadConfigMap:
