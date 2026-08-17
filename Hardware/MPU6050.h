@@ -14,7 +14,8 @@ typedef struct MPU6050_raw
     int16_t GyroZ;
     uint16_t Temp;
 }MPU6050_raw;
-//????????
+
+
 typedef struct MPU6050
 {
     float yaw;

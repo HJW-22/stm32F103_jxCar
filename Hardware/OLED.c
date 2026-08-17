@@ -665,7 +665,7 @@ void OLED_ShowUnsignedFloatNum(int16_t X, int16_t Y, float Number, uint8_t IntLe
  */
 void OLED_ShowImage(int16_t X, int16_t Y, int16_t Width, int16_t Height, const uint8_t *Image)
 {
-    int16_t j, i;
+    int16_t j, i    ;
     int16_t page, shift;
 
     OLED_ClearArea(X, Y, Width, Height); // «¯”Ú÷√0

@@ -174,10 +174,6 @@ float Angle_Get()
 }
 //往前倒+,往后- oled方向
 
-
-
-
-
 void Main_Config_OLED()
 {
     OLED_Init(I2C1,1);
@@ -211,11 +207,10 @@ void Main_Config_MPU6050()
     // }
 }
 
-
 void Main_Config()
 {
     Main_Config_OLED();
-    Main_Config_ESP8266();
+    // Main_Config_ESP8266();
     Main_Config_MPU6050();
     
     //串口初始化
@@ -394,7 +389,6 @@ void OLED_SerialSend()
     #endif // USART3_FLAG 
 }
 
-
 void OLED_PIDCycleSend()
 {
     #ifdef MOTORA_DEBUG
@@ -543,9 +537,6 @@ void Serial_change()
     }
 }
 
-
-
-
 #ifdef SETLOACTION_MODE
 void MotorControlLoop_SetLoaction() {
     // 读取实际值（例如编码器）
@@ -611,7 +602,6 @@ void MotorControlLoop_Dual() {
 }
 #endif //DUALCONTROL_MODE
 
-
 #ifdef ANGLE_MODE
 void MotorControlLoop_Angle() {
 
@@ -650,9 +640,6 @@ void MotorControlLoop_Angle() {
 
 }
 #endif //ANGLE_MODE
-
-
-
 
 int main(void){
    Delay_ms(10);
@@ -706,7 +693,7 @@ void TIM1_UP_IRQHandler(void)
             #endif // SETLOACTION_MODE
 
             #ifdef ANGLE_MODE
-            // MotorControlLoop_Angle();
+            MotorControlLoop_Angle();
             #endif // ANGLE_MODE
         }
         if(sys_cnt % 100 == 0)oled_BufDisplay_flag=1;
