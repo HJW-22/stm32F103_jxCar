@@ -1,506 +1,293 @@
-#include "stm32f10x.h" // Device header
 #include "bsp_i2c.h"
-#include "stdlib.h"
 
-// #define SI2C_CHRONOLOGY_DELAY_FLAG
+#define BSP_I2C_TIMEOUT 10000U
 
-typedef struct I2C_Private {
-    GPIO_TypeDef *GPIOx;
-    I2C_TypeDef *I2Cx;
-    int16_t SDA;
-    int16_t SCL;
-    int16_t I2C_Add;
-    int8_t Hard_I2C_EN;
-} I2C_Private;
-
-// I2C_BUS *Pthis_I2C = 0; // 全局指针
-
-#ifdef SI2C_CHRONOLOGY_DELAY_FLAG
-#define SI2C_CHRONOLOGY_DELAY_TIME 1 // 纳秒(us)为单位延时
-uint8_t SI2C_Delay = SI2C_CHRONOLOGY_DELAY_TIME;
-#endif
-
-//------------------------软件I2C基本时序部分------------------------
-static void SI2C_I2C_W_SCL(I2C_BUS* bus, uint8_t BitValue)
+/* This project carries an older CMSIS CM3 header that predates Arm Compiler
+ * 6.  Under AC6, its __get_PRIMASK declaration is treated as an external
+ * symbol.  Keep the timing-critical I2C sequences self-contained instead. */
+static uint32_t BSP_I2C_SaveAndDisableInterrupts(void)
 {
-    if (BitValue != Bit_RESET)
-        bus->Private->GPIOx->BSRR = bus->Private->SCL;
-    else
-        bus->Private->GPIOx->BRR = bus->Private->SCL;
-#ifdef SI2C_CHRONOLOGY_DELAY_FLAG
-    Delay_us(SI2C_Delay);
+    uint32_t primask;
+
+#if defined(__GNUC__) || defined(__clang__)
+    __asm volatile("mrs %0, primask" : "=r"(primask)::"memory");
+    __asm volatile("cpsid i" ::: "memory");
+#else
+    primask = __get_PRIMASK();
+    __disable_irq();
+#endif
+    return primask;
+}
+
+static void BSP_I2C_RestoreInterrupts(uint32_t primask)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    __asm volatile("msr primask, %0" ::"r"(primask) : "memory");
+#else
+    if (primask == 0U) __enable_irq();
 #endif
 }
 
-static void SI2C_I2C_W_SDA(I2C_BUS* bus, uint8_t BitValue)
+static void BSP_I2C_ShortDelay(void)
 {
-    if (BitValue != Bit_RESET)
-        bus->Private->GPIOx->BSRR = bus->Private->SDA;
-    else
-        bus->Private->GPIOx->BRR = bus->Private->SDA;
-#ifdef SI2C_CHRONOLOGY_DELAY_FLAG
-    Delay_us(SI2C_Delay);
-#endif
+    volatile uint32_t delay = 32U;
+    while (delay-- != 0U) {}
 }
 
-static uint8_t SI2C_I2C_R_SDA(I2C_BUS* bus)
+static void BSP_I2C_ClearErrors(I2C_TypeDef *I2Cx)
 {
-    return GPIO_ReadInputDataBit(bus->Private->GPIOx, bus->Private->SDA);
+    uint16_t errors = I2C_SR1_BERR | I2C_SR1_ARLO | I2C_SR1_AF |
+                      I2C_SR1_OVR | I2C_SR1_PECERR | I2C_SR1_TIMEOUT |
+                      I2C_SR1_SMBALERT;
+    I2Cx->SR1 &= (uint16_t)~errors;
 }
 
-static void SI2C_I2C_Start(I2C_BUS* bus)
+static uint8_t BSP_I2C_Abort(I2C_TypeDef *I2Cx)
 {
-    SI2C_I2C_W_SDA(bus, 1);
-    SI2C_I2C_W_SCL(bus, 1);
-    SI2C_I2C_W_SDA(bus, 0);
-    SI2C_I2C_W_SCL(bus, 0);
+    I2C_GenerateSTOP(I2Cx, ENABLE);
+    I2C_NACKPositionConfig(I2Cx, I2C_NACKPosition_Current);
+    I2C_AcknowledgeConfig(I2Cx, ENABLE);
+    BSP_I2C_ClearErrors(I2Cx);
+    return 0U;
 }
 
-static void SI2C_I2C_Stop(I2C_BUS* bus)
+static uint8_t BSP_I2C_WaitSR1Set(I2C_TypeDef *I2Cx, uint16_t flag)
 {
-    SI2C_I2C_W_SDA(bus, 0);
-    SI2C_I2C_W_SCL(bus, 1);
-    SI2C_I2C_W_SDA(bus, 1);
-}
+    uint32_t timeout = BSP_I2C_TIMEOUT;
 
-static void SI2C_I2C_SendByte(I2C_BUS* bus, uint8_t Byte)
-{
-    uint8_t i;
-    for (i = 0; i < 8; i++) {
-        SI2C_I2C_W_SDA(bus, !!(Byte & (0x80 >> i)));
-        SI2C_I2C_W_SCL(bus, 1);
-        SI2C_I2C_W_SCL(bus, 0);
+    while ((I2Cx->SR1 & flag) == 0U) {
+        if ((I2Cx->SR1 & (I2C_SR1_BERR | I2C_SR1_ARLO | I2C_SR1_AF |
+                          I2C_SR1_OVR | I2C_SR1_TIMEOUT)) != 0U) {
+            return BSP_I2C_Abort(I2Cx);
+        }
+        if (timeout-- == 0U) return BSP_I2C_Abort(I2Cx);
     }
+    return 1U;
 }
 
-//------------------------软件I2C测试(ACK)部分------------------------
-static uint8_t SI2C_ReceiveByte(I2C_BUS* bus)
+static uint8_t BSP_I2C_WaitEvent(I2C_TypeDef *I2Cx, uint32_t event)
 {
-    uint8_t i, Byte = 0x00;
-    SI2C_I2C_W_SDA(bus, 1);
-    for (i = 0; i < 8; i++) {
-        SI2C_I2C_W_SCL(bus, 1);
-        if (SI2C_I2C_R_SDA(bus)) { Byte |= (0x80 >> i); }
-        SI2C_I2C_W_SCL(bus, 0);
+    uint32_t timeout = BSP_I2C_TIMEOUT;
+
+    while (I2C_CheckEvent(I2Cx, event) != SUCCESS) {
+        if ((I2Cx->SR1 & (I2C_SR1_BERR | I2C_SR1_ARLO | I2C_SR1_AF |
+                          I2C_SR1_OVR | I2C_SR1_TIMEOUT)) != 0U) {
+            return BSP_I2C_Abort(I2Cx);
+        }
+        if (timeout-- == 0U) return BSP_I2C_Abort(I2Cx);
     }
-    return Byte;
+    return 1U;
 }
 
-static void SI2C_WriteAck(I2C_BUS* bus, uint8_t AckBit)
+static void BSP_I2C_ClearADDR(I2C_TypeDef *I2Cx)
 {
-    SI2C_I2C_W_SDA(bus, AckBit);
-    SI2C_I2C_W_SCL(bus, 1);
-    SI2C_I2C_W_SCL(bus, 0);
+    volatile uint16_t dummy;
+    dummy = I2Cx->SR1;
+    dummy = I2Cx->SR2;
+    (void)dummy;
 }
 
-static uint8_t SI2C_ReceiveAck(I2C_BUS* bus)
+static void BSP_I2C_GetPins(I2C_TypeDef *I2Cx, uint8_t remap,
+                            uint16_t *scl_pin, uint16_t *sda_pin)
 {
-    uint8_t AckBit;
-    SI2C_I2C_W_SDA(bus, 1);
-    SI2C_I2C_W_SCL(bus, 1);
-    AckBit = SI2C_I2C_R_SDA(bus);
-    SI2C_I2C_W_SCL(bus, 0);
-    return AckBit;
-}
-
-//------------------------硬件I2C基本时序部分------------------------
-static void HI2C_Rest_Speed(I2C_BUS* bus, uint32_t Speed)
-{
-    I2C_InitTypeDef I2C_InitStructure = {
-        .I2C_Mode = I2C_Mode_I2C,
-        .I2C_ClockSpeed = Speed,
-        .I2C_DutyCycle = I2C_DutyCycle_2,
-        .I2C_Ack = I2C_Ack_Enable,
-        .I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit,
-        .I2C_OwnAddress1 = 0x00
-    };
-    I2C_Init(bus->Private->I2Cx, &I2C_InitStructure);
-}
-
-static void HI2C_WaitEvent(I2C_BUS* bus, uint32_t I2C_EVENT)
-{
-    uint32_t Timeout = 10000;
-    while (I2C_CheckEvent(bus->Private->I2Cx, I2C_EVENT) != SUCCESS) {
-        if ((Timeout--) == 0) break;
-    }
-}
-
-//------------------------I2C公共接口部分------------------------
-static uint8_t _I2C_AdressScan(I2C_BUS* bus)
-{
-    if (bus->Private->Hard_I2C_EN) {
-        // 硬件I2C地址扫描实现
-        return 0;
+    if (I2Cx == I2C1 && remap != 0U) {
+        *scl_pin = GPIO_Pin_8;
+        *sda_pin = GPIO_Pin_9;
+    } else if (I2Cx == I2C1) {
+        *scl_pin = GPIO_Pin_6;
+        *sda_pin = GPIO_Pin_7;
     } else {
-        uint8_t address;
-        for (address = 1; address < 128; address++) {
-            SI2C_I2C_Start(bus);
-            SI2C_I2C_SendByte(bus, address << 1);
-            if (!SI2C_ReceiveAck(bus)) {
-                SI2C_I2C_Stop(bus);
-                return address;
-            }
-            SI2C_I2C_Stop(bus);
-        }
-    }
-    return 0;
-}
-
-static uint8_t SI2C_ACK_Test(I2C_BUS* bus)
-{
-    uint8_t Ack;
-    SI2C_I2C_Start(bus);
-    SI2C_I2C_SendByte(bus, bus->Private->I2C_Add);
-    Ack = SI2C_ReceiveAck(bus);
-    SI2C_I2C_Stop(bus);
-    return Ack;
-}
-
-static void _I2C_WriteReg(I2C_BUS* bus, uint8_t RegAddress, uint16_t Data)
-{
-    if (bus->Private->Hard_I2C_EN) {
-        I2C_GenerateSTART(bus->Private->I2Cx, ENABLE);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_MODE_SELECT);
-
-        I2C_Send7bitAddress(bus->Private->I2Cx, bus->Private->I2C_Add, I2C_Direction_Transmitter);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
-
-        I2C_SendData(bus->Private->I2Cx, RegAddress);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
-
-        if (bus->Mode16bit) {
-            I2C_SendData(bus->Private->I2Cx, (uint8_t)(Data >> 8));
-            HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
-        }
-        
-        I2C_SendData(bus->Private->I2Cx, (uint8_t)(Data & 0xFF));
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
-
-        I2C_GenerateSTOP(bus->Private->I2Cx, ENABLE);
-    } else {
-        SI2C_I2C_Start(bus);
-        SI2C_I2C_SendByte(bus, bus->Private->I2C_Add);
-        SI2C_ReceiveAck(bus);
-        SI2C_I2C_SendByte(bus, RegAddress);
-        SI2C_ReceiveAck(bus);
-
-        if (bus->Mode16bit) {
-            SI2C_I2C_SendByte(bus, (uint8_t)Data >> 8);
-            SI2C_ReceiveAck(bus);
-            SI2C_I2C_SendByte(bus, (uint8_t)(Data & 0x00FF));
-        } else {
-            SI2C_I2C_SendByte(bus, (uint8_t)Data);
-        }
-        SI2C_ReceiveAck(bus);
-        SI2C_I2C_Stop(bus);
+        *scl_pin = GPIO_Pin_10;
+        *sda_pin = GPIO_Pin_11;
     }
 }
 
-uint16_t _I2C_ReadReg(I2C_BUS* bus, uint8_t RegAddress)
+/* GPIO is used only before peripheral initialization to release a slave that
+ * held SDA low after an interrupted transfer.  Normal traffic is hardware I2C. */
+static void BSP_I2C_RecoverBus(I2C_TypeDef *I2Cx, uint8_t remap)
 {
-    uint16_t Data = 0;
-    if (bus->Private->Hard_I2C_EN) {
-        // 硬件I2C读取
-        I2C_GenerateSTART(bus->Private->I2Cx, ENABLE);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_MODE_SELECT);
+    GPIO_InitTypeDef gpio_config;
+    uint16_t scl_pin;
+    uint16_t sda_pin;
+    uint8_t pulse;
 
-        I2C_Send7bitAddress(bus->Private->I2Cx, bus->Private->I2C_Add, I2C_Direction_Transmitter);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+    BSP_I2C_GetPins(I2Cx, remap, &scl_pin, &sda_pin);
+    I2C_Cmd(I2Cx, DISABLE);
+    gpio_config.GPIO_Pin   = scl_pin | sda_pin;
+    gpio_config.GPIO_Mode  = GPIO_Mode_Out_OD;
+    gpio_config.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &gpio_config);
+    GPIO_SetBits(GPIOB, scl_pin | sda_pin);
+    BSP_I2C_ShortDelay();
 
-        I2C_SendData(bus->Private->I2Cx, RegAddress);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
-
-        I2C_GenerateSTART(bus->Private->I2Cx, ENABLE);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_MODE_SELECT);
-
-        I2C_Send7bitAddress(bus->Private->I2Cx, bus->Private->I2C_Add, I2C_Direction_Receiver);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
-
-        I2C_AcknowledgeConfig(bus->Private->I2Cx, DISABLE);
-        I2C_GenerateSTOP(bus->Private->I2Cx, ENABLE);
-
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_RECEIVED);
-        Data = I2C_ReceiveData(bus->Private->I2Cx);
-
-        // 16位模式读取第二字节
-        if (bus->Mode16bit) {
-            HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_RECEIVED);
-            Data = (Data << 8) | I2C_ReceiveData(bus->Private->I2Cx);
-        }
-
-        I2C_AcknowledgeConfig(bus->Private->I2Cx, ENABLE);
-    } else {
-        // 软件I2C读取
-        SI2C_I2C_Start(bus);
-        SI2C_I2C_SendByte(bus, bus->Private->I2C_Add);
-        SI2C_ReceiveAck(bus);
-        SI2C_I2C_SendByte(bus, RegAddress);
-        SI2C_ReceiveAck(bus);
-
-        SI2C_I2C_Start(bus);
-        SI2C_I2C_SendByte(bus, bus->Private->I2C_Add | 0x01); // 读命令
-        SI2C_ReceiveAck(bus);
-        
-        if (bus->Mode16bit) {
-            Data = (uint16_t)SI2C_ReceiveByte(bus) << 8;
-            Data |= SI2C_ReceiveByte(bus);
-        } else {
-            Data = SI2C_ReceiveByte(bus);
-        }
-        
-        SI2C_WriteAck(bus, 1); // 发送NACK结束通信
-        SI2C_I2C_Stop(bus);
+    for (pulse = 0U; pulse < 9U && GPIO_ReadInputDataBit(GPIOB, sda_pin) == Bit_RESET; ++pulse) {
+        GPIO_ResetBits(GPIOB, scl_pin);
+        BSP_I2C_ShortDelay();
+        GPIO_SetBits(GPIOB, scl_pin);
+        BSP_I2C_ShortDelay();
     }
-    return Data;
+
+    GPIO_ResetBits(GPIOB, sda_pin);
+    BSP_I2C_ShortDelay();
+    GPIO_SetBits(GPIOB, scl_pin);
+    BSP_I2C_ShortDelay();
+    GPIO_SetBits(GPIOB, sda_pin);
+    BSP_I2C_ShortDelay();
 }
 
-void _I2C_Write_Reg_continue(I2C_BUS* bus, uint8_t RegAddress, uint16_t count, uint8_t *pData)
+uint8_t BSP_I2C_WaitIdle(I2C_TypeDef *I2Cx)
 {
-    if (pData == NULL || count == 0) return;
-    
-    if (bus->Private->Hard_I2C_EN) {
-        // 硬件I2C连续写入
-        I2C_GenerateSTART(bus->Private->I2Cx, ENABLE);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_MODE_SELECT);
+    uint32_t timeout = BSP_I2C_TIMEOUT;
 
-        I2C_Send7bitAddress(bus->Private->I2Cx, bus->Private->I2C_Add, I2C_Direction_Transmitter);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
-
-        I2C_SendData(bus->Private->I2Cx, RegAddress);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
-
-        for (uint16_t i = 0; i < count; i++) {
-            I2C_SendData(bus->Private->I2Cx, pData[i]);
-            HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
+    while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY) != RESET) {
+        if (timeout-- == 0U) {
+            return 0U;
         }
-        
-        I2C_GenerateSTOP(bus->Private->I2Cx, ENABLE);
-    } else {
-        // 软件I2C连续写入
-        SI2C_I2C_Start(bus);
-        SI2C_I2C_SendByte(bus, bus->Private->I2C_Add);
-        SI2C_ReceiveAck(bus);
-        SI2C_I2C_SendByte(bus, RegAddress);
-        SI2C_ReceiveAck(bus);
-
-        for (uint16_t i = 0; i < count;) {
-            if (bus->Mode16bit && (i+1) < count) {
-                SI2C_I2C_SendByte(bus, pData[i]);
-                SI2C_ReceiveAck(bus);
-                SI2C_I2C_SendByte(bus, pData[i+1]);
-                SI2C_ReceiveAck(bus);
-                i += 2;
-            } else {
-                SI2C_I2C_SendByte(bus, pData[i]);
-                SI2C_ReceiveAck(bus);
-                i++;
-            }
-        }
-        SI2C_I2C_Stop(bus);
     }
+    return 1U;
 }
 
-void _I2C_Read_Reg_continue(I2C_BUS* bus, uint8_t RegAddress, uint16_t count, uint8_t *pData)
+void BSP_I2C_Init(I2C_TypeDef *I2Cx, uint8_t remap, uint32_t clock_hz)
 {
-    if (pData == NULL || count == 0) return;
-    
-    if (bus->Private->Hard_I2C_EN) {
-        // 硬件I2C连续读取
-        I2C_GenerateSTART(bus->Private->I2Cx, ENABLE);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_MODE_SELECT);
+    I2C_InitTypeDef i2c_config;
+    GPIO_InitTypeDef gpio_config;
+    uint16_t scl_pin;
+    uint16_t sda_pin;
 
-        I2C_Send7bitAddress(bus->Private->I2Cx, bus->Private->I2C_Add, I2C_Direction_Transmitter);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd((I2Cx == I2C1) ? RCC_APB1Periph_I2C1 : RCC_APB1Periph_I2C2,
+                           ENABLE);
 
-        I2C_SendData(bus->Private->I2Cx, RegAddress);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_TRANSMITTED);
-
-        I2C_GenerateSTART(bus->Private->I2Cx, ENABLE);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_MODE_SELECT);
-
-        I2C_Send7bitAddress(bus->Private->I2Cx, bus->Private->I2C_Add, I2C_Direction_Receiver);
-        HI2C_WaitEvent(bus, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);
-
-        I2C_AcknowledgeConfig(bus->Private->I2Cx, ENABLE);
-
-        for (uint16_t i = 0; i < count; i++) {
-            if (i == count - 1) {
-                I2C_AcknowledgeConfig(bus->Private->I2Cx, DISABLE); // 最后一个字节发NACK
-            }
-            HI2C_WaitEvent(bus, I2C_EVENT_MASTER_BYTE_RECEIVED);
-            pData[i] = I2C_ReceiveData(bus->Private->I2Cx);
-        }
-
-        I2C_GenerateSTOP(bus->Private->I2Cx, ENABLE);
-    } else {
-        // 软件I2C连续读取
-        SI2C_I2C_Start(bus);
-        SI2C_I2C_SendByte(bus, bus->Private->I2C_Add);
-        SI2C_ReceiveAck(bus);
-        SI2C_I2C_SendByte(bus, RegAddress);
-        SI2C_ReceiveAck(bus);
-
-        SI2C_I2C_Start(bus);
-        SI2C_I2C_SendByte(bus, bus->Private->I2C_Add | 0x01); // 读命令
-        SI2C_ReceiveAck(bus);
-        
-        for (uint16_t i = 0; i < count; i++) {
-            pData[i] = SI2C_ReceiveByte(bus);
-            if (bus->Mode16bit && (i + 1) < count) {
-                pData[i + 1] = SI2C_ReceiveByte(bus);
-                i++;
-            }
-        }
-        
-        SI2C_WriteAck(bus, 1); // 发送NACK结束通信
-        SI2C_I2C_Stop(bus);
+    if (I2Cx == I2C1 && remap != 0U) {
+        GPIO_PinRemapConfig(GPIO_Remap_I2C1, ENABLE);
+    } else if (I2Cx == I2C1) {
+        GPIO_PinRemapConfig(GPIO_Remap_I2C1, DISABLE);
     }
-} 
 
-//------------------------I2C创建部分------------------------
-/*
-GPIOx:选择你的GPIO口
-SCL:时钟线(必须同一个GPIO口)
-SDA:数据线(必须同一个GPIO口)
-Address:一般是地址没有进行移位过的
-*/
-I2C_BUS Create_SI2C(GPIO_TypeDef *GPIOx, uint16_t SCL, uint16_t SDA, uint8_t Address)
-{
-    I2C_BUS bus = {0};
-    bus.Private = malloc(sizeof(I2C_Private));
-    if (!bus.Private) return bus;
-    
-    bus.Private->GPIOx = GPIOx;
-    bus.Private->SCL = SCL;
-    bus.Private->SDA = SDA;
-    bus.Private->I2C_Add = Address << 1;
-    bus.Private->Hard_I2C_EN = 0;
-    
-    bus.ScanAdress = _I2C_AdressScan;
-    bus.AckTest = SI2C_ACK_Test;
-    bus.Write_Reg = _I2C_WriteReg;
-    bus.Read_Reg = _I2C_ReadReg;
-    bus.Rest_Speed = NULL;
-    bus.Write_Reg_continue = _I2C_Write_Reg_continue;
-    bus.Read_Reg_continue = _I2C_Read_Reg_continue;
-    bus.Mode16bit = 0;
+    BSP_I2C_RecoverBus(I2Cx, remap);
+    BSP_I2C_GetPins(I2Cx, remap, &scl_pin, &sda_pin);
+    gpio_config.GPIO_Pin   = scl_pin | sda_pin;
+    gpio_config.GPIO_Mode  = GPIO_Mode_AF_OD;
+    gpio_config.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &gpio_config);
 
-    if (GPIOx == GPIOA)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
-    else if (GPIOx == GPIOB)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
-    else if (GPIOx == GPIOC)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-    else if (GPIOx == GPIOD)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
-    else if (GPIOx == GPIOE)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOE, ENABLE);
-    else if (GPIOx == GPIOF)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOF, ENABLE);
-    else if (GPIOx == GPIOG)
-        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOG, ENABLE);
-
-    GPIO_InitTypeDef GPIO_Init_Struct;
-    GPIO_Init_Struct.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init_Struct.GPIO_Mode  = GPIO_Mode_Out_OD;
-    GPIO_Init_Struct.GPIO_Pin   = SCL | SDA;
-    GPIO_Init(GPIOx, &GPIO_Init_Struct);
-
-    GPIO_WriteBit(GPIOx, SCL, (BitAction)1);
-    GPIO_WriteBit(GPIOx, SDA, (BitAction)1);
-
-    return bus;
-}
-/*
-I2Cx:I2C1 I2C2选择硬件I2C
-Address:一般是地址没有进行移位过的7位地址
-*/
-I2C_BUS Create_HI2C(I2C_TypeDef *I2Cx, uint8_t Address,uint8_t AFIO_EN)
-{
-    I2C_BUS bus = {0};
-    bus.Private = malloc(sizeof(I2C_Private));
-    if (!bus.Private) return bus;
-    
-    bus.Private->I2Cx = I2Cx;
-    bus.Private->I2C_Add = Address << 1;
-    bus.Private->Hard_I2C_EN = 1;
-
-    bus.ScanAdress = _I2C_AdressScan;
-    bus.AckTest    = SI2C_ACK_Test;
-    bus.Mode16bit  = 0;
-    bus.Write_Reg  = _I2C_WriteReg;
-    bus.Read_Reg   = _I2C_ReadReg;
-    bus.Rest_Speed = HI2C_Rest_Speed;
-    bus.Read_Reg_continue = _I2C_Read_Reg_continue;
-    bus.Write_Reg_continue = _I2C_Write_Reg_continue;
-  
-
-    if (I2Cx == I2C1)
-        RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
-    else
-        RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
-
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB|RCC_APB2Periph_AFIO, ENABLE);
-
-     if (AFIO_EN)
-    {
-        if (I2Cx == I2C1)
-        {
-            GPIO_PinRemapConfig(GPIO_Remap_I2C1,ENABLE);
-        }
-        else
-        {
-            //F10x没有这个功能
-            //GPIO_PinRemapConfig(I2C2,ENABLE);     
-        }
-        
-    }
-    GPIO_InitTypeDef GPIO_InitStructure;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD; //!!!!!! OD mode!!!!!!!!开漏模式
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-
-    if (I2Cx == I2C1)
-    {
-        if (AFIO_EN)
-        {
-            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
-            GPIO_Init(GPIOB, &GPIO_InitStructure);
-        }
-        else 
-        {
-            GPIO_InitStructure.GPIO_Pin=GPIO_Pin_6 | GPIO_Pin_7;
-            GPIO_Init(GPIOB, &GPIO_InitStructure);
-        } 
-    }
-    else
-    {
-        if (AFIO_EN)
-        {
-            // 重映射后的引脚：PB10, PB11
-            GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10  | GPIO_Pin_11;
-            GPIO_Init(GPIOB, &GPIO_InitStructure);
-        }
-        else 
-        {
-            // 默认引脚：PB10, PB11 (I2C2默认就是这些引脚)
-            GPIO_InitStructure.GPIO_Pin=GPIO_Pin_10  | GPIO_Pin_11;
-            GPIO_Init(GPIOB, &GPIO_InitStructure);
-        } 
-    }
-  
-    I2C_InitTypeDef I2C_InitStructure;
-    I2C_InitStructure.I2C_Mode                = I2C_Mode_I2C; // Mode
-    I2C_InitStructure.I2C_ClockSpeed          = 400000;       // I2C速度设置
-    I2C_InitStructure.I2C_DutyCycle           = I2C_DutyCycle_2;
-    I2C_InitStructure.I2C_Ack                 = I2C_Ack_Enable;
-    I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-    I2C_InitStructure.I2C_OwnAddress1         = 0x00;
-    I2C_Init(I2Cx, &I2C_InitStructure);
-
+    I2C_DeInit(I2Cx);
+    I2C_SoftwareResetCmd(I2Cx, ENABLE);
+    I2C_SoftwareResetCmd(I2Cx, DISABLE);
+    i2c_config.I2C_Mode                = I2C_Mode_I2C;
+    i2c_config.I2C_ClockSpeed          = clock_hz;
+    i2c_config.I2C_DutyCycle           = I2C_DutyCycle_2;
+    i2c_config.I2C_Ack                 = I2C_Ack_Enable;
+    i2c_config.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+    i2c_config.I2C_OwnAddress1         = 0U;
+    I2C_Init(I2Cx, &i2c_config);
+    BSP_I2C_ClearErrors(I2Cx);
+    I2C_AcknowledgeConfig(I2Cx, ENABLE);
     I2C_Cmd(I2Cx, ENABLE);
-
-    return bus;
 }
 
+uint8_t BSP_I2C_MemWrite(I2C_TypeDef *I2Cx, uint8_t address7,
+                         uint8_t reg, const uint8_t *data, uint16_t count)
+{
+    uint16_t index;
 
+    if (data == 0 || count == 0U || !BSP_I2C_WaitIdle(I2Cx)) return 0U;
+    BSP_I2C_ClearErrors(I2Cx);
 
+    I2C_GenerateSTART(I2Cx, ENABLE);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT)) return 0U;
+    I2C_Send7bitAddress(I2Cx, (uint8_t)(address7 << 1), I2C_Direction_Transmitter);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) return 0U;
+    I2C_SendData(I2Cx, reg);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) return 0U;
+
+    for (index = 0U; index < count; ++index) {
+        I2C_SendData(I2Cx, data[index]);
+        if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) return 0U;
+    }
+    I2C_GenerateSTOP(I2Cx, ENABLE);
+    return 1U;
+}
+
+uint8_t BSP_I2C_MemRead(I2C_TypeDef *I2Cx, uint8_t address7,
+                        uint8_t reg, uint8_t *data, uint16_t count)
+{
+    uint16_t index;
+    uint32_t primask;
+
+    if (data == 0 || count == 0U || !BSP_I2C_WaitIdle(I2Cx)) return 0U;
+    BSP_I2C_ClearErrors(I2Cx);
+    I2C_AcknowledgeConfig(I2Cx, ENABLE);
+    I2C_NACKPositionConfig(I2Cx, I2C_NACKPosition_Current);
+
+    I2C_GenerateSTART(I2Cx, ENABLE);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT)) return 0U;
+    I2C_Send7bitAddress(I2Cx, (uint8_t)(address7 << 1), I2C_Direction_Transmitter);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) return 0U;
+    I2C_SendData(I2Cx, reg);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) return 0U;
+
+    I2C_GenerateSTART(I2Cx, ENABLE);
+    if (!BSP_I2C_WaitEvent(I2Cx, I2C_EVENT_MASTER_MODE_SELECT)) return 0U;
+    I2C_Send7bitAddress(I2Cx, (uint8_t)(address7 << 1), I2C_Direction_Receiver);
+
+    /* I2C_CheckEvent would read SR1/SR2 and clear ADDR too early here. */
+    if (!BSP_I2C_WaitSR1Set(I2Cx, I2C_SR1_ADDR)) return 0U;
+    if (count == 1U) {
+        /* RM0008: ACK, ADDR clearing and STOP must not be interrupted. */
+        primask = BSP_I2C_SaveAndDisableInterrupts();
+        I2C_AcknowledgeConfig(I2Cx, DISABLE);
+        BSP_I2C_ClearADDR(I2Cx);
+        I2C_GenerateSTOP(I2Cx, ENABLE);
+        BSP_I2C_RestoreInterrupts(primask);
+        if (!BSP_I2C_WaitSR1Set(I2Cx, I2C_SR1_RXNE)) return 0U;
+        data[0] = I2C_ReceiveData(I2Cx);
+        I2C_AcknowledgeConfig(I2Cx, ENABLE);
+        return 1U;
+    }
+
+    if (count == 2U) {
+        /* POS makes the NACK apply to the second byte.  Clearing ADDR and ACK
+         * is one timing-critical sequence on STM32F1. */
+        I2C_NACKPositionConfig(I2Cx, I2C_NACKPosition_Next);
+        primask = BSP_I2C_SaveAndDisableInterrupts();
+        I2C_AcknowledgeConfig(I2Cx, DISABLE);
+        BSP_I2C_ClearADDR(I2Cx);
+        BSP_I2C_RestoreInterrupts(primask);
+
+        if (!BSP_I2C_WaitSR1Set(I2Cx, I2C_SR1_BTF)) return 0U;
+        primask = BSP_I2C_SaveAndDisableInterrupts();
+        I2C_GenerateSTOP(I2Cx, ENABLE);
+        data[0] = I2C_ReceiveData(I2Cx);
+        BSP_I2C_RestoreInterrupts(primask);
+        data[1] = I2C_ReceiveData(I2Cx);
+        I2C_NACKPositionConfig(I2Cx, I2C_NACKPosition_Current);
+        I2C_AcknowledgeConfig(I2Cx, ENABLE);
+        return 1U;
+    }
+
+    BSP_I2C_ClearADDR(I2Cx);
+    index = 0U;
+    while (index < (uint16_t)(count - 3U)) {
+        if (!BSP_I2C_WaitSR1Set(I2Cx, I2C_SR1_RXNE)) return 0U;
+        data[index++] = I2C_ReceiveData(I2Cx);
+    }
+
+    /* With three bytes left, BTF guarantees two bytes are buffered.  NACK the
+     * final byte before draining N-2, then issue STOP while the last byte is
+     * still in the shift register (RM0008 master receiver sequence). */
+    if (!BSP_I2C_WaitSR1Set(I2Cx, I2C_SR1_BTF)) return 0U;
+    primask = BSP_I2C_SaveAndDisableInterrupts();
+    I2C_AcknowledgeConfig(I2Cx, DISABLE);
+    data[index++] = I2C_ReceiveData(I2Cx);
+    BSP_I2C_RestoreInterrupts(primask);
+    if (!BSP_I2C_WaitSR1Set(I2Cx, I2C_SR1_BTF)) return 0U;
+
+    primask = BSP_I2C_SaveAndDisableInterrupts();
+    I2C_GenerateSTOP(I2Cx, ENABLE);
+    data[index++] = I2C_ReceiveData(I2Cx);
+    BSP_I2C_RestoreInterrupts(primask);
+    data[index] = I2C_ReceiveData(I2Cx);
+    I2C_AcknowledgeConfig(I2Cx, ENABLE);
+    return 1U;
+}

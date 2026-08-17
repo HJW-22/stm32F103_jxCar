@@ -1,4 +1,3 @@
-#include "stm32f10x.h"
 #include "oled_font.h"
 #include "delay.h"
 #include "oled.h"
@@ -9,27 +8,50 @@
 #include "bsp_i2c.h"
 #include "stm32f10x_dma.h"
 
-I2C_BUS OLED_I2C;
+#define OLED_ADDRESS      0x3CU
+#define OLED_I2C          I2C1
+#define OLED_I2C_SPEED_HZ 400000U
+#define OLED_I2C_TIMEOUT  10000U
+#define OLED_WIDTH       128U
+#define OLED_HEIGHT      64U
 
-
-// 包装函数实现
-void OLED_Write_Wrapper(uint8_t RegAddress, uint16_t Data) {
-    OLED_I2C.Write_Reg(&OLED_I2C, RegAddress, Data);
+static void OLED_WriteCommand(uint8_t control, uint8_t command)
+{
+    (void)BSP_I2C_MemWrite(OLED_I2C, OLED_ADDRESS, control, &command, 1U);
 }
 
-void OLED_Write_Continue_Wrapper(uint8_t RegAddress, uint16_t Count, uint8_t* Data) {
-    OLED_I2C.Write_Reg_continue(&OLED_I2C, RegAddress, Count, Data);
+static void OLED_WriteData(uint8_t control, uint16_t count, const uint8_t *data)
+{
+    (void)BSP_I2C_MemWrite(OLED_I2C, OLED_ADDRESS, control, data, count);
 }
 
-#define OLED_WriteCommand(RegAddress,Data)           OLED_Write_Wrapper(RegAddress,Data)
-#define OLED_WriteData(RegAddress,count,pData)       OLED_Write_Continue_Wrapper(RegAddress,count,pData)
+static uint8_t OLED_I2C_WaitEvent(uint32_t event)
+{
+    uint32_t timeout = OLED_I2C_TIMEOUT;
 
+    while (I2C_CheckEvent(OLED_I2C, event) != SUCCESS) {
+        if (timeout-- == 0U) {
+            I2C_GenerateSTOP(OLED_I2C, ENABLE);
+            return 0U;
+        }
+    }
+    return 1U;
+}
 
-#define OLED_ADDRESS 0x3C // OLED I2C地址
+/* Start an SSD1306 display-data transaction and leave it open for DMA. */
+static uint8_t OLED_DMA_BeginTransfer(void)
+{
+    if (!BSP_I2C_WaitIdle(OLED_I2C)) return 0U;
+
+    I2C_GenerateSTART(OLED_I2C, ENABLE);
+    if (!OLED_I2C_WaitEvent(I2C_EVENT_MASTER_MODE_SELECT)) return 0U;
+    I2C_Send7bitAddress(OLED_I2C, (uint8_t)(OLED_ADDRESS << 1), I2C_Direction_Transmitter);
+    if (!OLED_I2C_WaitEvent(I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) return 0U;
+    I2C_SendData(OLED_I2C, 0x40U);
+    return OLED_I2C_WaitEvent(I2C_EVENT_MASTER_BYTE_TRANSMITTED);
+}
 
 uint8_t OLED_DisplayBuf[8][128];
-
-
 
 // #define OLED_CHRONOLOGY_DELAY_FLAG
 
@@ -42,7 +64,6 @@ uint8_t OLED_DisplayBuf[8][128];
 // #define OLED_GPIO_CLK   RCC_APB2Periph_GPIOB
 // #define OLED_I2C_SCL    GPIO_Pin_8
 // #define OLED_I2C_SDA    GPIO_Pin_9
-
 
 /*
 //------------------------软件I2C基本时序部分------------------------
@@ -140,57 +161,53 @@ void OLED_WriteData(uint8_t address, uint8_t *Data, uint8_t Count)
 }
 */
 
-
-
-
 //------------------------软件I2C通讯部分------------------------
 
 /* OLED初始化 */
-void OLED_Init(I2C_TypeDef *I2Cx,uint8_t AFIO_EN)
+void OLED_Init(void)
 {
-    // 硬件初始化
-    OLED_I2C = Create_HI2C(I2C1,OLED_ADDRESS,1);//创建软件IIC
-    Delay_ms(100);      // 重要延时，等待OLED电源稳定
-    
+    BSP_I2C_Init(OLED_I2C, 1U, OLED_I2C_SPEED_HZ);
+    Delay_ms(100); // 重要延时，等待OLED电源稳定
+
     // 软件初始化（SSD1306命令配置）
     OLED_WriteCommand(0x00, 0xAE); // 关闭显示（DISPLAYOFF）
 
     /* 基础显示设置 */
-    OLED_WriteCommand(0x00, 0x20);  // 设置内存地址模式（Memory Addressing Mode）
-    OLED_WriteCommand(0x00, 0x00);  // 水平地址模式（Horizontal Addressing Mode）
-    OLED_WriteCommand(0x00, 0xB0);  // 设置页起始地址（Page Start Address）
-    OLED_WriteCommand(0x00, 0xC8);  // 设置COM输出扫描方向（COM Output Scan Direction）：反向（从下到上）
-    OLED_WriteCommand(0x00, 0x00);  // 设置列地址低4位（Lower Column Start Address）
-    OLED_WriteCommand(0x00, 0x10);  // 设置列地址高4位（Higher Column Start Address）
-    OLED_WriteCommand(0x00, 0x40);  // 设置显示起始行（Display Start Line）：0
-    OLED_WriteCommand(0x00, 0x81);  // 设置对比度控制（Contrast Control）
-    OLED_WriteCommand(0x00, 0xFF);  // 对比度值（最大亮度，0xFF）
-    OLED_WriteCommand(0x00, 0xA1);  // 设置段重映射（Segment Re-map）：列地址127映射到SEG0（水平翻转）
-    OLED_WriteCommand(0x00, 0xA6);  // 设置正常显示（Normal Display，非反色）
-    OLED_WriteCommand(0x00, 0xA8);  // 设置多路复用比率（Multiplex Ratio）
-    OLED_WriteCommand(0x00, 0x3F);  // 默认值0x3F（对应64行）
-    OLED_WriteCommand(0x00, 0xA4);  // 禁用全局显示（Disable Entire Display On）
-    OLED_WriteCommand(0x00, 0xD3);  // 设置显示偏移（Display Offset）
-    OLED_WriteCommand(0x00, 0x00);  // 无偏移（Vertical Shift = 0）
+    OLED_WriteCommand(0x00, 0x20); // 设置内存地址模式（Memory Addressing Mode）
+    OLED_WriteCommand(0x00, 0x00); // 水平地址模式（Horizontal Addressing Mode）
+    OLED_WriteCommand(0x00, 0xB0); // 设置页起始地址（Page Start Address）
+    OLED_WriteCommand(0x00, 0xC8); // 设置COM输出扫描方向（COM Output Scan Direction）：反向（从下到上）
+    OLED_WriteCommand(0x00, 0x00); // 设置列地址低4位（Lower Column Start Address）
+    OLED_WriteCommand(0x00, 0x10); // 设置列地址高4位（Higher Column Start Address）
+    OLED_WriteCommand(0x00, 0x40); // 设置显示起始行（Display Start Line）：0
+    OLED_WriteCommand(0x00, 0x81); // 设置对比度控制（Contrast Control）
+    OLED_WriteCommand(0x00, 0xFF); // 对比度值（最大亮度，0xFF）
+    OLED_WriteCommand(0x00, 0xA1); // 设置段重映射（Segment Re-map）：列地址127映射到SEG0（水平翻转）
+    OLED_WriteCommand(0x00, 0xA6); // 设置正常显示（Normal Display，非反色）
+    OLED_WriteCommand(0x00, 0xA8); // 设置多路复用比率（Multiplex Ratio）
+    OLED_WriteCommand(0x00, 0x3F); // 默认值0x3F（对应64行）
+    OLED_WriteCommand(0x00, 0xA4); // 禁用全局显示（Disable Entire Display On）
+    OLED_WriteCommand(0x00, 0xD3); // 设置显示偏移（Display Offset）
+    OLED_WriteCommand(0x00, 0x00); // 无偏移（Vertical Shift = 0）
 
     /* 时序和电源配置 */
-    OLED_WriteCommand(0x00, 0xD5);  // 设置显示时钟分频（Display Clock Divide Ratio/Oscillator Frequency）
-    OLED_WriteCommand(0x00, 0xF0);  // 默认分频比（0xF0）
-    OLED_WriteCommand(0x00, 0xD9);  // 设置预充电周期（Pre-charge Period）
-    OLED_WriteCommand(0x00, 0x22);  // Phase1 = 2 DCLK, Phase2 = 2 DCLK
-    OLED_WriteCommand(0x00, 0xDA);  // 设置COM引脚配置（COM Pins Hardware Configuration）
-    OLED_WriteCommand(0x00, 0x12);  // 序列模式（Sequential COM Pin Config），禁用左右复用（Alternative COM Pin Disable）
-    OLED_WriteCommand(0x00, 0xDB);  // 设置VCOMH电压（VCOMH Deselect Level）
-    OLED_WriteCommand(0x00, 0x20);  // 默认值0x20（~0.77 * VCC）
+    OLED_WriteCommand(0x00, 0xD5); // 设置显示时钟分频（Display Clock Divide Ratio/Oscillator Frequency）
+    OLED_WriteCommand(0x00, 0xF0); // 默认分频比（0xF0）
+    OLED_WriteCommand(0x00, 0xD9); // 设置预充电周期（Pre-charge Period）
+    OLED_WriteCommand(0x00, 0x22); // Phase1 = 2 DCLK, Phase2 = 2 DCLK
+    OLED_WriteCommand(0x00, 0xDA); // 设置COM引脚配置（COM Pins Hardware Configuration）
+    OLED_WriteCommand(0x00, 0x12); // 序列模式（Sequential COM Pin Config），禁用左右复用（Alternative COM Pin Disable）
+    OLED_WriteCommand(0x00, 0xDB); // 设置VCOMH电压（VCOMH Deselect Level）
+    OLED_WriteCommand(0x00, 0x20); // 默认值0x20（~0.77 * VCC）
 
     /* 电源管理 */
-    OLED_WriteCommand(0x00, 0x8D);  // 设置电荷泵（Charge Pump Setting）
-    OLED_WriteCommand(0x00, 0x14);  // 启用电荷泵（Enable Charge Pump）
-    OLED_WriteCommand(0x00, 0xAF);  // 开启显示（DISPLAYON）
+    OLED_WriteCommand(0x00, 0x8D); // 设置电荷泵（Charge Pump Setting）
+    OLED_WriteCommand(0x00, 0x14); // 启用电荷泵（Enable Charge Pump）
+    OLED_WriteCommand(0x00, 0xAF); // 开启显示（DISPLAYON）
 
     /* 初始化后处理 */
-    OLED_Clear();   // 清空显存（全写0）
-    OLED_Update();  // 更新显示，防止初始化后花屏
+    OLED_Clear();  // 清空显存（全写0）
+    OLED_Update(); // 更新显示，防止初始化后花屏
 }
 
 /**
@@ -349,6 +366,37 @@ void OLED_UpdateArea(int16_t X, int16_t Y, int16_t Width, int16_t Height)
 }
 
 /**
+ * @brief  设置 SSD1306 后续显存写入的水平/页寻址窗口
+ * @note   Y 与 Height 以像素为单位，内部会扩展到覆盖区域的整页。
+ */
+void OLED_SetWindow(uint8_t X, uint8_t Y, uint8_t Width, uint8_t Height)
+{
+    uint8_t PageStart;
+    uint8_t PageEnd;
+
+    if ((X >= OLED_WIDTH) || (Y >= OLED_HEIGHT) || (Width == 0) || (Height == 0)) {
+        return;
+    }
+
+    if ((uint16_t)X + Width > OLED_WIDTH) {
+        Width = OLED_WIDTH - X;
+    }
+    if ((uint16_t)Y + Height > OLED_HEIGHT) {
+        Height = OLED_HEIGHT - Y;
+    }
+
+    PageStart = Y / 8;
+    PageEnd   = (Y + Height - 1) / 8;
+
+    OLED_WriteCommand(0x00, 0x21);
+    OLED_WriteCommand(0x00, X);
+    OLED_WriteCommand(0x00, X + Width - 1);
+    OLED_WriteCommand(0x00, 0x22);
+    OLED_WriteCommand(0x00, PageStart);
+    OLED_WriteCommand(0x00, PageEnd);
+}
+
+/**
  * @brief  OLED显示一个字符
  * @param  X 起始行位置   范围:0~127
  * @param  Y 起始列位置   范围:0~63
@@ -379,7 +427,7 @@ void OLED_ShowChar(int16_t X, int16_t Y, char Char, int16_t FontSize)
  *                                        OLED_6X8		  宽6像素，高8像素
  * @retval 无
  */
-void  OLED_ShowString(int16_t X, int16_t Y, char *String, uint8_t FontSize)
+void OLED_ShowString(int16_t X, int16_t Y, char *String, uint8_t FontSize)
 {
 
     uint16_t i = 0;
@@ -405,7 +453,7 @@ void  OLED_ShowString(int16_t X, int16_t Y, char *String, uint8_t FontSize)
             SingleChar[0] = String[i++];
             if (String[i] == '\0') break;
             SingleChar[1] = String[i++];
-            if (SingleChar[i] == '\0') break;
+            if (String[i] == '\0') break;
             SingleChar[2] = String[i++];
             SingleChar[3] = '\0';
         } else if ((String[i] & 0xF8) == 0xF0) {
@@ -413,9 +461,9 @@ void  OLED_ShowString(int16_t X, int16_t Y, char *String, uint8_t FontSize)
             SingleChar[0] = String[i++];
             if (String[i] == '\0') break;
             SingleChar[1] = String[i++];
-            if (SingleChar[i] == '\0') break;
+            if (String[i] == '\0') break;
             SingleChar[2] = String[i++];
-            if (SingleChar[i] == '\0') break;
+            if (String[i] == '\0') break;
             SingleChar[3] = String[i++];
             SingleChar[4] = '\0';
         } else {
@@ -665,7 +713,7 @@ void OLED_ShowUnsignedFloatNum(int16_t X, int16_t Y, float Number, uint8_t IntLe
  */
 void OLED_ShowImage(int16_t X, int16_t Y, int16_t Width, int16_t Height, const uint8_t *Image)
 {
-    int16_t j, i    ;
+    int16_t j, i;
     int16_t page, shift;
 
     OLED_ClearArea(X, Y, Width, Height); // 区域置0
@@ -674,15 +722,16 @@ void OLED_ShowImage(int16_t X, int16_t Y, int16_t Width, int16_t Height, const u
     for (j = 0; j < (Height - 1) / 8 + 1; j++) {
         // 宽度循环
         for (i = 0; i < Width; i++) {
-            // 舍弃过多部分
-            if (X + i >= 0 && X + i <= 127) {
-                page  = Y / 8; // 获取页区
-                shift = Y % 8; // 获取移位值
-                // 如果为负值 +1
-                if (Y < 0) {
-                    page -= 1;
-                    shift += 8;
-                }
+            if ((X + i < 0) || (X + i >= OLED_WIDTH)) {
+                continue;
+            }
+
+            page  = Y / 8; // 获取页区
+            shift = Y % 8; // 获取移位值
+            // 如果为负值 +1
+            if (Y < 0) {
+                page -= 1;
+                shift += 8;
             }
             // 先循环上半部分
             if (page + j >= 0 && page + j <= 7) {
@@ -716,136 +765,77 @@ void OLED_Printf(int16_t X, int16_t Y, uint8_t FontSize, char *format, ...)
     OLED_ShowString(X, Y, String, FontSize); // OLED显示字符数组（字符串）
 }
 
-
 uint8_t OLED_ID(void)
 {
-  return 1;
+    return 1;
 }
 
-
-
-
 // OLED DMA部分
-volatile uint8_t OLED_DMA_TransferComplete = 0;
-
-
+volatile uint8_t OLED_DMA_TransferComplete = 1U;
 
 // DMA初始化
 void OLED_DMA_Init(void)
 {
     DMA_InitTypeDef DMA_InitStructure;
-    
+
     // 开启DMA时钟
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
-    
+
     // 配置DMA通道（I2C1 TX用DMA1 Channel6）
     DMA_DeInit(DMA1_Channel6);
-    
-    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(I2C1->DR);
-    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)OLED_DisplayBuf; 
-    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;  // 传输方向 寄存器->外设
-    DMA_InitStructure.DMA_BufferSize = 1025;             // 动态设置
-    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;  //外设是否为递增
-    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;           //存储器是否为递增
-    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte; //外设数据类型 
-    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;//存储器数据类型 
-    DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;          //模式  CIRC                  1位 循环(ADC) 标准
-    DMA_InitStructure.DMA_Priority = DMA_Priority_High;    //优先级 PL                   2位 低 中 高 最高
-    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;           //存储器到存储器模式 MEM2MEM   1位 非 启
+
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(OLED_I2C->DR);
+    DMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)OLED_DisplayBuf;
+    DMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST; // 传输方向 寄存器->外设
+    DMA_InitStructure.DMA_BufferSize         = 1024U;
+    DMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;   // 外设是否为递增
+    DMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;        // 存储器是否为递增
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte; // 外设数据类型
+    DMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;     // 存储器数据类型
+    DMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;             // 模式  CIRC                  1位 循环(ADC) 标准
+    DMA_InitStructure.DMA_Priority           = DMA_Priority_High;           // 优先级 PL                   2位 低 中 高 最高
+    DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;             // 存储器到存储器模式 MEM2MEM   1位 非 启
     DMA_Init(DMA1_Channel6, &DMA_InitStructure);
-    
+
     // 启用DMA传输完成中断
     DMA_ITConfig(DMA1_Channel6, DMA_IT_TC, ENABLE);
-    
+
     // 配置NVIC
     NVIC_InitTypeDef NVIC_InitStructure;
-    NVIC_InitStructure.NVIC_IRQChannel = DMA1_Channel6_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannel                   = DMA1_Channel6_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority        = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd                = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
-    
-    // 启用I2C DMA请求
-    I2C_DMACmd(I2C1, ENABLE);
+
+    DMA_ClearITPendingBit(DMA1_IT_GL6);
+    I2C_DMACmd(OLED_I2C, ENABLE);
+    I2C_DMALastTransferCmd(OLED_I2C, ENABLE);
+    OLED_DMA_TransferComplete = 1U;
 }
 
 // DMA中断服务函数
 void DMA1_Channel6_IRQHandler(void)
 {
-    if(DMA_GetITStatus(DMA1_IT_TC6))
-    {
-        DMA_ClearITPendingBit(DMA1_IT_TC6 | DMA1_IT_TE6 | DMA1_IT_HT6);
-        I2C_GenerateSTOP(I2C1, ENABLE);//关闭I2C1总线
-        OLED_DMA_TransferComplete = 0;  // 只设置标志位，不操作DMA通道
+    if (DMA_GetITStatus(DMA1_IT_TC6) || DMA_GetITStatus(DMA1_IT_TE6)) {
+        DMA_Cmd(DMA1_Channel6, DISABLE);
+        DMA_ClearITPendingBit(DMA1_IT_GL6);
+        I2C_GenerateSTOP(OLED_I2C, ENABLE);
+        OLED_DMA_TransferComplete = 1U;
     }
 }
 
 // 带DMA的OLED刷新
 void OLED_Update_DMA(void)
 {
-    while (OLED_DMA_TransferComplete);
-    // 等待I2C就绪
-    while(I2C_GetFlagStatus(I2C1, I2C_FLAG_BUSY));
-    
-    // 启动I2C传输
-    I2C_GenerateSTART(I2C1, ENABLE);
-    while(!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));
-    
-    // 发送设备地址+写
-    I2C_Send7bitAddress(I2C1, 0x78, I2C_Direction_Transmitter);
-    while(!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
-    
-    // 发送控制字节(0x40表示数据)
-    I2C_SendData(I2C1, 0x40);
-    while(!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
-    
-    // 配置DMA
-    DMA_Cmd(DMA1_Channel6, DISABLE);
-    // 配置并启动DMA
-    OLED_DMA_TransferComplete = 1;
-    DMA_SetCurrDataCounter(DMA1_Channel6,1025);
-    DMA_Cmd(DMA1_Channel6, ENABLE);
-}
+    if (OLED_DMA_TransferComplete == 0U) return;
+    OLED_SetWindow(0, 0, OLED_WIDTH, OLED_HEIGHT);
+    if (!OLED_DMA_BeginTransfer()) return;
 
-
-void OLED_UpdateArea_DMA(int16_t X, int16_t Y, int16_t Width, int16_t Height)
-{
-    // 参数检查
-    if(X < 0 || X > 127 || Y < 0 || Y > 7) return;
-    if(Width <= 0 || Width > 128) Width = 128 - X;
-    if(Height <= 0 || Height > 8) Height = 8 - Y;
-    
-    // 等待上次DMA传输完成
-    while(OLED_DMA_TransferComplete == 0);
-    
-    // 等待I2C空闲
-    while(I2C_GetFlagStatus(I2C1, I2C_FLAG_BUSY));
-    
-    // 启动I2C传输
-    I2C_GenerateSTART(I2C1, ENABLE);
-    while(!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));
-    
-    // 发送设备地址+写
-    I2C_Send7bitAddress(I2C1, 0x78, I2C_Direction_Transmitter);
-    while(!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
-    
-    // 发送控制字节(0x40表示数据)
-    I2C_SendData(I2C1, 0x40);
-    while(!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
-    
-    // 配置DMA
     DMA_Cmd(DMA1_Channel6, DISABLE);
-    
-    // 设置DMA源地址(显存区域)
-    DMA1_Channel6->CMAR = (uint32_t)&OLED_DisplayBuf[Y][X];
-    
-    // 设置传输数据量(宽度×页数)
-    uint16_t transfer_size = Width * Height;
-    DMA_SetCurrDataCounter(DMA1_Channel6, transfer_size);
-    
-    // 标记DMA传输状态
-    OLED_DMA_TransferComplete = 0;
-    
-    // 启动DMA传输
+    DMA1_Channel6->CMAR = (uint32_t)OLED_DisplayBuf;
+    DMA_SetCurrDataCounter(DMA1_Channel6, 1024U);
+    DMA_ClearITPendingBit(DMA1_IT_GL6);
+    OLED_DMA_TransferComplete = 0U;
     DMA_Cmd(DMA1_Channel6, ENABLE);
 }

@@ -363,7 +363,7 @@ ESP8266_INIT_ERROR ESP8266_Init(uint32_t baudrate)
     atk_mw8266d_send_at_cmd("AT+CIPMUX=0","OK",500);
 
     //7. 连接TCP服务器
-    if(atk_mw8266d_connect_tcp_server("192.168.5.7", "8086") != ATK_MW8266D_EOK) {
+    if(atk_mw8266d_connect_tcp_server("192.168.5.64", "8086") != ATK_MW8266D_EOK) {
         return ESP8266_CONNECTTCPSERVER_ERROR;
     }
 		Delay_ms(800);

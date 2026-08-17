@@ -1,34 +1,23 @@
-#ifndef __I2C_H__
-#define __I2C_H__
+#ifndef BSP_I2C_H
+#define BSP_I2C_H
+
 #include "stm32f10x.h"
-#define SI2C_delay_time 0																			//设置硬件I2C的延时速度
-// #define I2C(obj) (Pthis_I2C = &obj)																	//Pthis全局指针宏定义
-typedef struct I2C_Private I2C_Private;		
 
-typedef struct I2C_BUS
-{
-	//严禁使用该指针!(私有变量) It is strictly forbidden to use this pointer
-	I2C_Private* Private;
+/* Fixed hardware-I2C interface. STM32 peripherals are fixed resources, so
+ * this API uses explicit peripherals rather than allocated function objects. */
 
-	//常用函数                 			                                                              //用户API函数接口
-	void (*Write_Reg)(struct I2C_BUS* bus,uint8_t RegAddress, uint16_t Data);											 //写寄存器函数(默认8bit操作),write register by I2C bus
-	uint16_t (*Read_Reg)(struct I2C_BUS* bus,uint8_t RegAddress);													     //读寄存器函数(默认8bit操作),read register by I2C bus
+/* I2C1: remap=0 selects PB6/PB7, remap=1 selects PB8/PB9.
+ * I2C2 always uses PB10/PB11 and ignores remap. */
+void BSP_I2C_Init(I2C_TypeDef *I2Cx, uint8_t remap, uint32_t clock_hz);
 
-	//扩展函数
-	uint8_t (*ScanAdress)(struct I2C_BUS* bus);																		 //扫描IIC地址并返回,Scan IIC address and return it
-	uint8_t (*AckTest)(struct I2C_BUS* bus);																			 //响应接口(1 success,0 failed),it can check that if our I2C bus is init succese
-	uint8_t Mode16bit;																				 //将IIC升级为16位操作(置1为升级),boost reg operation to 16bit
-	void (*Rest_Speed)(struct I2C_BUS* bus,uint32_t Speed);																 //硬件I2C重新设置速度,you can reset your Hardware I2C Speed	
-	void (*Write_Reg_continue)(struct I2C_BUS* bus,uint8_t RegAddress,uint16_t Count,uint8_t* Data);//连续写寄存器函数,continue write register by I2C bus，为了适应移植
-	void (*Read_Reg_continue)(struct I2C_BUS* bus,uint8_t RegAddress,uint16_t Count,uint8_t* Data); //连续读寄存器函数,continue read register by I2C bus，为了适应移植
+/* Blocking register transactions; address7 is an unshifted 7-bit address.
+ * Both functions return 1 on success and 0 after a bounded timeout. */
+uint8_t BSP_I2C_MemWrite(I2C_TypeDef *I2Cx, uint8_t address7,
+                         uint8_t reg, const uint8_t *data, uint16_t count);
+uint8_t BSP_I2C_MemRead(I2C_TypeDef *I2Cx, uint8_t address7,
+                        uint8_t reg, uint8_t *data, uint16_t count);
 
-}I2C_BUS;
-
-// extern I2C_BUS* Pthis_I2C;
-
-//初始化函数
-I2C_BUS Create_SI2C(GPIO_TypeDef* GPIOx,uint16_t SCL,uint16_t SDA,uint8_t Address);					//创建软件I2C对象,create a softwere I2C
-I2C_BUS Create_HI2C(I2C_TypeDef* I2Cx,uint8_t Address,uint8_t AFIO_EN);												//创建硬件I2C对象,create a hardware I2C
-
+/* Returns 1 when the bus is idle, otherwise 0 after a bounded timeout. */
+uint8_t BSP_I2C_WaitIdle(I2C_TypeDef *I2Cx);
 
 #endif
